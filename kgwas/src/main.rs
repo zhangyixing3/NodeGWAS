@@ -124,7 +124,7 @@ fn main() {
             for line in second_reader {
                 if let Ok(li) = line {
                     let values: Vec<&str> = li.split_whitespace().collect();
-                    let chrom = "0";
+                    let chrom = "1";
                     let pos = "0";
                     let id = values[0];
                     let ref_allele = "1";
