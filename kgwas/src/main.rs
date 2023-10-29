@@ -3,12 +3,14 @@ use clap::Parser;
 use env_logger::fmt::Target;
 use env_logger::Builder;
 use log::LevelFilter;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
 mod merge;
+mod tobed;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -30,17 +32,17 @@ enum Subcli {
         /// input files
         #[arg(short = 'i', long = "intput", required = true)]
         input: String,
-        /// prefix of output file
-        #[arg(short = 'o', long = "output", default_value = "merge")]
+        /// output file
+        #[arg(short = 'o', long = "output", default_value = "kmer_table")]
         prefix: String,
     },
-    /// to do
-    filter {
+    /// kmers_table to plink bed
+    tobed {
         /// merge result
         #[arg(short = 'i', long = "intput", required = true)]
         input: String,
-        /// prefix of output file
-        #[arg(short = 'o', long = "output", default_value = "filter")]
+        /// output file
+        #[arg(short = 'o', long = "output", default_value = "merge.bed")]
         prefix: String,
     },
     /// kmers_table to vcf
@@ -48,9 +50,18 @@ enum Subcli {
         /// kmers_table
         #[arg(short = 'k', long = "ktable", required = true)]
         ktable: String,
-        /// prefix of output file
-        #[arg(short = 'o', long = "output", default_value = "table")]
+        /// output file
+        #[arg(short = 'o', long = "output", default_value = "merge.vcf")]
         prefix: String,
+    },
+    // order trait file
+    order {
+        /// emmax_tfam
+        #[arg(short = 'e', long = "emmaxtfam", required = true)]
+        tfam: String,
+        /// trait file
+        #[arg(short = 't', long = "trait", required = true)]
+        trait_f: String,
     },
 }
 
@@ -95,12 +106,10 @@ fn main() {
             let header = "\
 ##fileformat=VCFv4.2
 ##source=kgwasV1.90
-##contig=<ID=0>
 ##INFO=<ID=PR,Number=0,Type=Flag,Description=\"Provisional reference allele, may not be based on real reference genome\">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
             let header1 = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
-            let output_file = format!("{}.vcf", prefix);
-            let mut file = File::create(output_file).expect("create output fail");
+            let mut file = File::create(prefix).expect("create output fail");
             log::info!("Output vcf created successfully!");
             file.write_all(header.as_bytes()).unwrap();
 
@@ -140,8 +149,10 @@ fn main() {
                     let mut tem_value: Vec<&str> = Vec::new();
                     for &value in values[1..].iter() {
                         let allele = match value {
-                            "0" => "0/0",
-                            "1" => "1/1",
+                            // kmer_table  0 = Absence,  1 = Presence 
+                            // vcf    0 =  Presence, 1 = Absence
+                            "0" => "1/1",
+                            "1" => "0/0",
                             _ => {
                                 panic!("open input file error");
                             }
@@ -156,9 +167,71 @@ fn main() {
 
             log::info!("Congratulations, it's successful!");
         }
-        _ => {
-            eprint!("error command!");
-            std::process::exit(1);
+        Subcli::order { tfam, trait_f } => {
+            let trait_file = File::open(&trait_f).expect("open trait file fail!");
+            let trait_reader = BufReader::new(trait_file);
+            let mut tem: HashMap<String, String> = HashMap::new();
+            for line in trait_reader.lines() {
+                let line = line.unwrap();
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                tem.insert(parts[0].to_string(), line);
+            }
+
+            let tfam_file = File::open(tfam).expect("open tfam fail !");
+            let tfam_reader = BufReader::new(tfam_file);
+
+            let mut file = File::create(trait_f).expect("create output fail");
+            // println!("{:?}", tem);
+            for line in tfam_reader.lines() {
+                let line = line.unwrap();
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                // println!("{}", parts[0]);
+                if tem.contains_key(parts[0]) {
+                    file.write_all(tem[parts[0]].as_bytes()).unwrap();
+                    file.write_all(&[b'\n']).unwrap();
+                }
+            }
         }
+        Subcli::tobed { input, prefix } => {
+            let sample: Vec<String>;
+            let mut snp_id: Vec<String> = Vec::new();
+            let mut genotype: Vec<Vec<i8>> = Vec::new();
+
+            let f: File = File::open(&input).expect("open inuput file error");
+            let reader = BufReader::new(f);
+
+            let first_line: Option<Result<String, std::io::Error>> = reader.lines().next();
+            if let Some(Ok(sample_tem)) = first_line {
+                sample = sample_tem
+                    .trim()
+                    .split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect();
+            } else {
+                panic!("Error: Failed to read header from  input");
+            }
+
+            // check sample information
+            let sample_len = sample.len();
+            if sample_len == 0 {
+                panic!("Error: We can't find sample")
+            } else {
+                log::info!("Get sample information from input");
+            }
+
+            log::info!("Open {} again.", &input);
+            let f: File = File::open(input).expect("open input file error");
+            let reader = BufReader::new(f);
+            let second_reader: std::iter::Skip<std::io::Lines<BufReader<File>>> =
+                reader.lines().skip(1);
+            tobed::get_matrix(&mut genotype, second_reader, sample_len, &mut snp_id);
+
+            let arr: ndarray::ArrayBase<ndarray::OwnedRepr<i8>, ndarray::Dim<[usize; 2]>> =
+                tobed::vec2arr(genotype);
+            log::info!("Successfully converted Vec to Array");
+            log::info!("Begin write to {}...", prefix);
+            tobed::write2bed(prefix, sample, &snp_id, arr);
+            log::info!("Congratulations, it's successful!");
+        },
     }
 }

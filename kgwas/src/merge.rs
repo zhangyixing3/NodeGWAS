@@ -40,7 +40,11 @@ pub fn filetohash(file: &String, nodes: &mut HashSet<u32>) -> HashSet<u32> {
             if let Ok(number) = number_str.trim().parse::<u32>() {
                 sub_node.insert(number);
                 nodes.insert(number);
+            } else {
+                panic!("{}", format!("check {}", file));
             }
+        } else {
+            panic!("{}", format!("check {}", file));
         }
     }
     sub_node
@@ -52,8 +56,7 @@ pub fn count_subsample(
     nodes: HashSet<u32>,
     header: Vec<String>,
 ) {
-    let output_file = format!("{}.txt", prefix);
-    let mut file = File::create(output_file).expect("create output fail");
+    let mut file = File::create(prefix).expect("create output fail");
     // write header
     file.write_all(b"\t").unwrap();
     let header_str = header.join("\t") + "\n";
