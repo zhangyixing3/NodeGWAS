@@ -1,8 +1,10 @@
 use chrono::Local;
 use clap::Parser;
+use core::panic;
 use env_logger::fmt::Target;
 use env_logger::Builder;
 use log::LevelFilter;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
@@ -22,6 +24,13 @@ mod tobed;
 struct Args {
     #[clap(subcommand)]
     command: Subcli,
+}
+
+struct Data {
+    id: u32,
+    new_line: String,
+    tem_value: String,
+    source: u8,
 }
 
 #[derive(Parser, Debug)]
@@ -50,11 +59,14 @@ enum Subcli {
         /// kmers_table
         #[arg(short = 'k', long = "ktable", required = true)]
         ktable: String,
-        /// output file
-        #[arg(short = 'o', long = "output", default_value = "merge.vcf")]
-        prefix: String,
+        /// node haptype
+        #[arg(short = 'n', long = "node", required = true)]
+        node: String,
+        // /// output file
+        // #[arg(short = 'o', long = "output", default_value = "merge.vcf")]
+        // prefix: String,
     },
-    // order trait file
+    /// order trait file
     order {
         /// emmax_tfam
         #[arg(short = 'e', long = "emmaxtfam", required = true)]
@@ -62,6 +74,15 @@ enum Subcli {
         /// trait file
         #[arg(short = 't', long = "trait", required = true)]
         trait_f: String,
+    },
+    /// get node INF
+    extract {
+        /// graph file
+        #[arg(short = 'g', long = "graph", required = true)]
+        graph: String,
+        /// node
+        #[arg(short = 'n', long = "node", default_value = "nodes")]
+        node: String,
     },
 }
 
@@ -89,7 +110,9 @@ fn main() {
     let arg: Args = Args::parse();
     match arg.command {
         Subcli::merge { input, prefix } => {
+            // return file paths and kmertable header
             let (a, header) = merge::filetovec(input);
+            // we check file exit.
             merge::check_path(&a);
             log::info!("We find {} samples", a.len());
             let mut all_samples: Vec<HashSet<u32>> = Vec::new();
@@ -102,38 +125,30 @@ fn main() {
             merge::count_subsample(prefix, all_samples, nodes, header);
             log::info!("Congratulations, it's successful!");
         }
-        Subcli::tovcf { ktable, prefix } => {
-            let header = "\
-##fileformat=VCFv4.2
-##source=kgwasV1.90
-##INFO=<ID=PR,Number=0,Type=Flag,Description=\"Provisional reference allele, may not be based on real reference genome\">
-##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
-            let header1 = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
-            let mut file = File::create(prefix).expect("create output fail");
-            log::info!("Output vcf created successfully!");
-            file.write_all(header.as_bytes()).unwrap();
+        Subcli::tovcf { ktable, node } => {
+            // get node INF
+            let node = File::open(node).unwrap();
+            let reader = BufReader::new(node);
+            let mut node_h: HashMap<String, u8> = HashMap::new();
+            for line in reader.lines() {
+                let line = line.unwrap();
+                let tem_value: Vec<&str> = line.trim().split_whitespace().collect();
+                node_h.insert(tem_value[0].to_owned(), tem_value[1].parse::<u8>().unwrap());
+            }
+            log::info!("Get node information");
 
+
+
+            log::info!("Open kmer_table");
             let f: File = File::open(&ktable).expect("open sample file error");
             let reader = BufReader::new(f);
-
-            let first_line = reader.lines().next();
-            if let Some(Ok(header2)) = first_line {
-                let header_ok = format!("{}{}{}", header1, header2, "\n");
-                file.write_all(header_ok.as_bytes()).unwrap();
-            } else {
-                panic!("Error: Failed to read header2 from the file.");
-            }
-            log::info!("VCF header has been written to the file successfully.");
-
-            log::info!("Open kmer_table again.");
-            let f: File = File::open(ktable).expect("open sample file error");
-            let reader = BufReader::new(f);
+            let mut data_vec: Vec<Data> = Vec::new();
             let second_reader = reader.lines().skip(1);
             log::info!("kmer_table convert to vcf ...");
             for line in second_reader {
                 if let Ok(li) = line {
                     let values: Vec<&str> = li.split_whitespace().collect();
-                    let chrom = "1";
+                    // let chrom = "1";
                     let pos = "0";
                     let id = values[0];
                     let ref_allele = "1";
@@ -143,13 +158,13 @@ fn main() {
                     let info = "PR";
                     let format_field = "GT";
                     let new_line = format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-                        chrom, pos, id, ref_allele, alt_allele, qual, filter, info, format_field
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+                        pos, id, ref_allele, alt_allele, qual, filter, info, format_field
                     );
                     let mut tem_value: Vec<&str> = Vec::new();
                     for &value in values[1..].iter() {
                         let allele = match value {
-                            // kmer_table  0 = Absence,  1 = Presence 
+                            // kmer_table  0 = Absence,  1 = Presence
                             // vcf    0 =  Presence, 1 = Absence
                             "0" => "1/1",
                             "1" => "0/0",
@@ -160,10 +175,64 @@ fn main() {
                         tem_value.push(allele);
                     }
                     let tem_value = tem_value.join("\t");
-                    file.write_all(format!("{}{}{}", new_line, tem_value, "\n").as_bytes())
-                        .unwrap();
+                    let node_source = node_h.get(id);
+                    let source = node_source
+                        .unwrap_or_else(|| panic!("Can't find node {} INF", id))
+                        .to_owned();
+
+                    let data: Data = Data {
+                        id: id.parse::<u32>().unwrap(),
+                        new_line:format!("{}\t{}", source, new_line),
+                        tem_value,
+                        source,
+                    };
+
+                    data_vec.push(data);
                 }
             }
+
+            // Sort the data by id(nodes)
+            data_vec.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
+            let mut grouped_data: HashMap<u8, Vec<Data>> = HashMap::new();
+            for data in data_vec {
+                let entry = grouped_data.entry(data.source).or_insert(vec![]);
+                entry.push(data);
+            }
+
+            // for data in data_vec {
+            //     let line = format!("{}{}\n", data.new_line, data.tem_value);
+            //     file.write_all(line.as_bytes()).unwrap();
+            // }
+
+            log::info!("Write INF to the VCF.");
+            grouped_data.par_iter().for_each(|(key, values)| {
+
+                let filename = format!("{}_vcf",key);
+                let mut file = File::create(filename).expect("Failed to create file");
+                            // vcf Header
+                let header = "\
+##fileformat=VCFv4.2
+##source=kgwasV1.90
+##INFO=<ID=PR,Number=0,Type=Flag,Description=\"Provisional reference allele, may not be based on real reference genome\">
+##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
+                        let header1 = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
+                        file.write_all(header.as_bytes()).unwrap();
+                        let f: File = File::open(&ktable).expect("open sample file error");
+                        let reader = BufReader::new(f);
+                        let first_line = reader.lines().next();
+                        if let Some(Ok(header2)) = first_line {
+                            let header_ok = format!("{}{}{}", header1, header2, "\n");
+                            file.write_all(header_ok.as_bytes()).unwrap();
+                        } else {
+                            panic!("Error: Failed to read header2 from the file.");
+                        }
+
+                // 将 values 中的数据写入文件
+                for data in values {
+                    let line = format!("{}{}\n", data.new_line, data.tem_value);
+                    file.write_all(line.as_bytes()).expect("Failed to write to file");
+                }
+    });
 
             log::info!("Congratulations, it's successful!");
         }
@@ -232,6 +301,48 @@ fn main() {
             log::info!("Begin write to {}...", prefix);
             tobed::write2bed(prefix, sample, &snp_id, arr);
             log::info!("Congratulations, it's successful!");
-        },
+        }
+        Subcli::extract { graph, node } => {
+            let f = File::open(graph).expect("open file failed");
+            let mut node = File::create(node).expect("create output fail");
+            let mut tem: HashSet<String> = HashSet::new();
+            let reader = BufReader::new(f);
+
+            for line in reader.lines() {
+                let line = line.expect("read line failed");
+                // gfa format Walk line
+                if line.starts_with('W') {
+                    let line_l: Vec<&str> = line.trim().split_whitespace().collect();
+                    let haptype: &str = line_l[3];
+                    let node_s: &str = line_l[6];
+
+                    for i in node_s.split('>') {
+                        if i.is_empty() {
+                            continue;
+                        }
+
+                        if !tem.contains(i) {
+                            let haptype = &haptype[..haptype.len() - 1];
+                            writeln!(node, "{}\t{}", i, haptype).expect("write failed");
+                            tem.insert(i.to_owned());
+                        }
+                    }
+                } else if line.starts_with('P') {
+                    let line_l: Vec<&str> = line.trim().split_whitespace().collect();
+                    let haptype: &str = line_l[1];
+                    let node_s: &str = line_l[2];
+                    for i in node_s.split(&['+', '-', ','][..]) {
+                        if i.is_empty() {
+                            continue;
+                        }
+                        if !tem.contains(i) {
+                            let haptype = &haptype[..haptype.len() - 1];
+                            writeln!(node, "{}\t{}", i, haptype).expect("write failed");
+                            tem.insert(i.to_owned());
+                        }
+                    }
+                }
+            }
+        }
     }
 }

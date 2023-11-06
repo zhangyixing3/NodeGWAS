@@ -3,7 +3,9 @@ use std::fs::File;
 use std::io::BufReader;
 
 /// vec<vec<i8>> -> ndarray and reversed
-pub fn vec2arr(genotype: Vec<Vec<i8>>) -> ndarray::ArrayBase<ndarray::OwnedRepr<i8>, ndarray::Dim<[usize; 2]>>{
+pub fn vec2arr(
+    genotype: Vec<Vec<i8>>,
+) -> ndarray::ArrayBase<ndarray::OwnedRepr<i8>, ndarray::Dim<[usize; 2]>> {
     let rows = genotype.len();
     let cols = genotype[0].len();
     let mut arr = ndarray::Array2::<i8>::default((cols, rows));
@@ -16,15 +18,13 @@ pub fn vec2arr(genotype: Vec<Vec<i8>>) -> ndarray::ArrayBase<ndarray::OwnedRepr<
     arr
 }
 
-
 /// write something to Plink bed
 pub fn write2bed(
     prefix: String,
     sample: Vec<String>,
-    snp: & Vec<String>,
+    snp: &Vec<String>,
     arr: ndarray::ArrayBase<ndarray::OwnedRepr<i8>, ndarray::Dim<[usize; 2]>>,
 ) {
-
     // https://docs.rs/bed-reader/0.2.34/bed_reader/struct.WriteOptions.html#method.builder
     WriteOptions::builder(&prefix)
         .fid(&sample)
@@ -42,7 +42,6 @@ pub fn write2bed(
         .num_threads(5)
         .write(&arr)
         .unwrap();
-
 }
 
 /// from kmer_table get matrix
@@ -65,7 +64,7 @@ pub fn get_matrix(
                         1_i8 => 2_i8,
                         _ => {
                             panic!("Error: Strange ")
-                        },
+                        }
                     };
                     genotype_tem.push(value);
                 } else {

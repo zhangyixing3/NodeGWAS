@@ -50,6 +50,7 @@ pub fn filetohash(file: &String, nodes: &mut HashSet<u32>) -> HashSet<u32> {
     sub_node
 }
 
+/// Iterate through nodes, check if the sample contains the node, assign 1 if yes, 0 if no
 pub fn count_subsample(
     prefix: String,
     all_samples: Vec<HashSet<u32>>,
@@ -62,10 +63,10 @@ pub fn count_subsample(
     let header_str = header.join("\t") + "\n";
     file.write_all(header_str.as_bytes()).unwrap();
     for i in nodes {
-        let mut tem: u32 = 0;
         let mut tem_vec: Vec<String> = Vec::new();
         tem_vec.push(i.to_string());
         for j in &all_samples {
+            let mut tem: u32 = 0;
             if j.contains(&i) {
                 tem = 1;
             }
