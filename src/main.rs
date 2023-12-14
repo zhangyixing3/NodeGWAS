@@ -11,9 +11,11 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
+mod filter;
+mod gam;
+mod liftover;
 mod merge;
 mod tobed;
-
 
 #[derive(Parser, Debug)]
 #[command(
@@ -81,9 +83,33 @@ enum Subcli {
         /// graph file
         #[arg(short = 'g', long = "graph", required = true)]
         graph: String,
-        /// node
-        #[arg(short = 'n', long = "node", default_value = "nodes")]
+        /// node source(sample)
+        #[arg(short = 'n', long = "node", default_value = "nodes_INF")]
         node: String,
+    },
+    /// gam convert to node
+    tonode {
+        /// nodes output
+        #[arg(short = 'n', long = "node", required = true)]
+        node_file: String,
+    },
+    /// filter nodes < 2
+    filter {
+        /// gam to  node file
+        #[arg(short = 'n', long = "node", required = true)]
+        node_file: String,
+        /// output file
+        #[arg(short = 'o', long = "out", required = true)]
+        output: String,
+    },
+    /// coordinate conversion
+    liftover {
+        ///  walk => path, gfa file
+        #[arg(short = 'g', long = "gfa", required = true)]
+        gfa: String,
+        /// position result
+        #[arg(short = 'o', long = "out", required = true)]
+        output: String,
     },
 }
 
@@ -133,12 +159,14 @@ fn main() {
             let mut node_h: HashMap<String, u8> = HashMap::new();
             for line in reader.lines() {
                 let line = line.unwrap();
-                let tem_value: Vec<&str> = line.trim().split_whitespace().collect();
-                node_h.insert(tem_value[0].to_owned(), tem_value[1].parse::<u8>().unwrap());
+                let tem_value: Vec<&str> =
+                    line.trim().split_whitespace().collect();
+                node_h.insert(
+                    tem_value[0].to_owned(),
+                    tem_value[1].parse::<u8>().unwrap(),
+                );
             }
             log::info!("Get node information");
-
-
 
             log::info!("Open kmer_table");
             let f: File = File::open(&ktable).expect("open sample file error");
@@ -160,7 +188,14 @@ fn main() {
                     let format_field = "GT";
                     let new_line = format!(
                         "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-                        pos, id, ref_allele, alt_allele, qual, filter, info, format_field
+                        pos,
+                        id,
+                        ref_allele,
+                        alt_allele,
+                        qual,
+                        filter,
+                        info,
+                        format_field
                     );
                     let mut tem_value: Vec<&str> = Vec::new();
                     for &value in values[1..].iter() {
@@ -183,7 +218,7 @@ fn main() {
 
                     let data: Data = Data {
                         id: id.parse::<u32>().unwrap(),
-                        new_line:format!("{}\t{}", source, new_line),
+                        new_line: format!("{}\t{}", source, new_line),
                         tem_value,
                         source,
                     };
@@ -238,7 +273,8 @@ fn main() {
             log::info!("Congratulations, it's successful!");
         }
         Subcli::order { tfam, trait_f } => {
-            let trait_file = File::open(&trait_f).expect("open trait file fail!");
+            let trait_file =
+                File::open(&trait_f).expect("open trait file fail!");
             let trait_reader = BufReader::new(trait_file);
             let mut tem: HashMap<String, String> = HashMap::new();
             for line in trait_reader.lines() {
@@ -250,15 +286,21 @@ fn main() {
             let tfam_file = File::open(tfam).expect("open tfam fail !");
             let tfam_reader = BufReader::new(tfam_file);
 
-            let mut file = File::create(trait_f).expect("create output fail");
+            let mut file =
+                File::create(trait_f + ".order").expect("create output fail");
             // println!("{:?}", tem);
             for line in tfam_reader.lines() {
                 let line = line.unwrap();
                 let parts: Vec<&str> = line.split_whitespace().collect();
-                // println!("{}", parts[0]);
+
                 if tem.contains_key(parts[0]) {
                     file.write_all(tem[parts[0]].as_bytes()).unwrap();
                     file.write_all(&[b'\n']).unwrap();
+                } else {
+                    file.write_all(
+                        format!("{}\tNone\tNone\n", parts[0]).as_bytes(),
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -270,7 +312,8 @@ fn main() {
             let f: File = File::open(&input).expect("open inuput file error");
             let reader = BufReader::new(f);
 
-            let first_line: Option<Result<String, std::io::Error>> = reader.lines().next();
+            let first_line: Option<Result<String, std::io::Error>> =
+                reader.lines().next();
             if let Some(Ok(sample_tem)) = first_line {
                 sample = sample_tem
                     .trim()
@@ -292,12 +335,20 @@ fn main() {
             log::info!("Open {} again.", &input);
             let f: File = File::open(input).expect("open input file error");
             let reader = BufReader::new(f);
-            let second_reader: std::iter::Skip<std::io::Lines<BufReader<File>>> =
-                reader.lines().skip(1);
-            tobed::get_matrix(&mut genotype, second_reader, sample_len, &mut snp_id);
+            let second_reader: std::iter::Skip<
+                std::io::Lines<BufReader<File>>,
+            > = reader.lines().skip(1);
+            tobed::get_matrix(
+                &mut genotype,
+                second_reader,
+                sample_len,
+                &mut snp_id,
+            );
 
-            let arr: ndarray::ArrayBase<ndarray::OwnedRepr<i8>, ndarray::Dim<[usize; 2]>> =
-                tobed::vec2arr(genotype);
+            let arr: ndarray::ArrayBase<
+                ndarray::OwnedRepr<i8>,
+                ndarray::Dim<[usize; 2]>,
+            > = tobed::vec2arr(genotype);
             log::info!("Successfully converted Vec to Array");
             log::info!("Begin write to {}...", prefix);
             tobed::write2bed(prefix, sample, &snp_id, arr);
@@ -313,7 +364,8 @@ fn main() {
                 let line = line.expect("read line failed");
                 // gfa format Walk line
                 if line.starts_with('W') {
-                    let line_l: Vec<&str> = line.trim().split_whitespace().collect();
+                    let line_l: Vec<&str> =
+                        line.trim().split_whitespace().collect();
                     let haptype: &str = line_l[3];
                     let node_s: &str = line_l[6];
 
@@ -324,12 +376,14 @@ fn main() {
 
                         if !tem.contains(i) {
                             let haptype = &haptype[..haptype.len() - 1];
-                            writeln!(node, "{}\t{}", i, haptype).expect("write failed");
+                            writeln!(node, "{}\t{}", i, haptype)
+                                .expect("write failed");
                             tem.insert(i.to_owned());
                         }
                     }
                 } else if line.starts_with('P') {
-                    let line_l: Vec<&str> = line.trim().split_whitespace().collect();
+                    let line_l: Vec<&str> =
+                        line.trim().split_whitespace().collect();
                     let haptype: &str = line_l[1];
                     let node_s: &str = line_l[2];
                     for i in node_s.split(&['+', '-', ','][..]) {
@@ -338,12 +392,28 @@ fn main() {
                         }
                         if !tem.contains(i) {
                             let haptype = &haptype[..haptype.len() - 1];
-                            writeln!(node, "{}\t{}", i, haptype).expect("write failed");
+                            writeln!(node, "{}\t{}", i, haptype)
+                                .expect("write failed");
                             tem.insert(i.to_owned());
                         }
                     }
                 }
             }
+        }
+        Subcli::tonode { node_file } => {
+            log::info!("file write to {}", &node_file);
+            let node_file =
+                File::create(node_file).expect("create output fail");
+            gam::run(node_file);
+            log::info!("Congratulations, it's successful!");
+        }
+        Subcli::filter { node_file, output } => {
+            filter::filter_ids(&node_file, &output);
+        }
+        Subcli::liftover { gfa, output } => {
+            log::info!("open {}", &gfa);
+            liftover::run(gfa, output);
+            log::info!("Congratulations, it's successful!");
         }
     }
 }
