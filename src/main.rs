@@ -124,7 +124,7 @@ fn main() {
             writeln!(
                 buf,
                 "{}\t[{}]\t{}",
-                // Local::now().format("%Y/%m/%d %H:%M:%S"),
+                //    Local::now().format("%Y/%m/%d %H:%M:%S"),
                 style.value(Local::now().format("%Y/%m/%d %H:%M:%S")),
                 level,
                 style.value(record.args())
