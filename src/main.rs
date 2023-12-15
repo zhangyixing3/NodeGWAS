@@ -113,7 +113,7 @@ enum Subcli {
     },
 }
 
-#[warn(unreachable_patterns)]
+
 fn main() {
     // init log setting
     Builder::new()
