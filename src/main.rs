@@ -113,7 +113,6 @@ enum Subcli {
     },
 }
 
-
 fn main() {
     // init log setting
     Builder::new()
