@@ -14,7 +14,7 @@ struct Path {
 #[derive(Deserialize)]
 struct Mapping {
     edit: Option<Vec<Edit>>,
-    position: Option<Position>,
+    position: Option<Vec<Position>>,
 }
 #[derive(Deserialize)]
 struct Edit {
@@ -30,23 +30,30 @@ struct Position {
 
 /// Checks if the given Edit item is valid
 fn is_valid_item(item: &Edit) -> bool {
-    item.sequence.is_some()
-        || (item.from_length.is_some() ^ item.to_length.is_some())
+    item.sequence.is_some() || {
+        if let (Some(from_length), Some(to_length)) = (item.from_length, item.to_length) {
+            from_length != to_length
+        } else {
+            true
+        }
+    }
 }
 
+
 /// This function processes the given position and writes the node_id to the output buffer.
-fn process_position(position: &Option<Position>, output: &mut BufWriter<File>) {
-    // Check if the provided position is not None
-    if let Some(position) = position {
-        // Check if the offset is None and the node_id is Some
-        if position.offset.is_none() && position.node_id.is_some() {
-            // If the conditions are met, write the node_id to the output buffer
-            if let Some(node_id) = &position.node_id {
-                writeln!(output, "{}", node_id).expect("write failed");
+fn process_position(position: &Option<Vec<Position>>, output: &mut BufWriter<File>) {
+    if let Some(positions) = position {
+        for pos in positions.iter() {
+            if let Some(node_id) = &pos.node_id {
+                if pos.offset.is_none() {
+                    writeln!(output, "{}", node_id).expect("write failed");
+                }
             }
         }
     }
 }
+
+
 
 /// This function reads JSON values from standard input,
 /// processes them, and writes the result to the output file.
@@ -62,7 +69,7 @@ pub fn run(output: File) {
     // Deserialize JSON values from the input reader into MyStruct type
     let stream =
         serde_json::Deserializer::from_reader(reader).into_iter::<MyStruct>();
-
+    // https://github.com/vgteam/vg/issues/4202 gam format
     // Iterate over the stream of JSON values
     for value in stream {
         // Match the deserialized values
