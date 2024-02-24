@@ -1,7 +1,10 @@
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs::File;
-use std::io::BufWriter;
-use std::io::{self, Write};
+use std::io;
+use std::io::Write;
 
 #[derive(Deserialize)]
 struct MyStruct {
@@ -42,11 +45,11 @@ fn is_valid_item(item: &Edit) -> bool {
 }
 
 /// This function processes the given position and writes the node_id to the output buffer.
-fn process_position(position: &Option<Position>, output: &mut BufWriter<File>) {
+fn process_position(position: &Option<Position>, output: &mut Vec<usize>) {
     if let Some(positions) = position {
         if let Some(node_id) = &positions.node_id {
             if positions.offset.is_none() {
-                writeln!(output, "{}", node_id).expect("write failed");
+                output.push(node_id.parse().unwrap());
             }
         }
     }
@@ -54,14 +57,13 @@ fn process_position(position: &Option<Position>, output: &mut BufWriter<File>) {
 
 /// This function reads JSON values from standard input,
 /// processes them, and writes the result to the output file.
-pub fn run(output: File) {
+pub fn run(output: String) {
     // Read from stdin
     let stdin = io::stdin();
     let handle = stdin.lock();
     let reader = io::BufReader::new(handle);
 
-    // Create a buffer writer for the output file
-    let mut output: io::BufWriter<File> = io::BufWriter::new(output);
+    let mut node_l: Vec<usize> = Vec::new();
 
     // Deserialize JSON values from the input reader into MyStruct type
     let stream =
@@ -84,7 +86,7 @@ pub fn run(output: File) {
                                 continue;
                             } else {
                                 // Process the position and write the result to the output file
-                                process_position(&i.position, &mut output);
+                                process_position(&i.position, &mut node_l);
                             }
                         }
                     }
@@ -95,4 +97,19 @@ pub fn run(output: File) {
             }
         }
     }
+    // count the number of nodes and repeats
+    let mut counts: HashMap<usize, usize> = HashMap::new();
+    for number in node_l {
+        *counts.entry(number).or_insert(0) += 1;
+    }
+
+    let path = output + ".gz";
+    let file = File::create(path).unwrap();
+    let mut encoder = GzEncoder::new(file, Compression::default());
+
+    for (number, count) in counts {
+        writeln!(encoder, "{}\t{}", number, count).unwrap();
+    }
+
+    encoder.finish().unwrap();
 }

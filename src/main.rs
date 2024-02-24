@@ -11,6 +11,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
+mod count;
 mod filter;
 mod gam;
 mod liftover;
@@ -92,6 +93,12 @@ enum Subcli {
         /// nodes output
         #[arg(short = 'n', long = "node", required = true)]
         node_file: String,
+    },
+    /// count node info from gam file
+    count {
+        /// gam to node file output
+        #[arg(short = 'n', long = "node", required = true)]
+        count_file: String,
     },
     /// filter nodes < 2
     filter {
@@ -412,6 +419,10 @@ fn main() {
         Subcli::liftover { gfa, output } => {
             log::info!("open {}", &gfa);
             liftover::run(gfa, output);
+            log::info!("Congratulations, it's successful!");
+        }
+        Subcli::count { count_file } => {
+            count::run(count_file);
             log::info!("Congratulations, it's successful!");
         }
     }
