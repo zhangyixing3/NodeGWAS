@@ -4,11 +4,9 @@ use rayon::iter::{
 };
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::Write;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-
 /// Represents a collection of file paths and corresponding headers.
 pub struct Samples {
     paths: Vec<String>,
@@ -92,7 +90,7 @@ impl Samples {
     }
     pub fn path_to_sets(
         &self,
-    ) -> io::Result<Vec<(String, String, HashSet<usize>)>> {
+    ) -> io::Result<Arc<Mutex<Vec<(String, String, HashSet<usize>)>>>> {
         let all_nodes: Arc<Mutex<Vec<(String, String, HashSet<usize>)>>> =
             Arc::new(Mutex::new(Vec::new()));
 
@@ -146,37 +144,51 @@ impl Samples {
                 Ok(())
             })?;
 
-        let locked_nodes = all_nodes.lock().unwrap();
-        Ok(locked_nodes.clone())
+        Ok(all_nodes)
     }
 
     pub fn merge_write(
         &self,
-        all_nodes: Vec<(String, String, HashSet<usize>)>,
+        all_nodes: io::Result<
+            Arc<Mutex<Vec<(String, String, HashSet<usize>)>>>,
+        >,
         output_file_path: &str,
     ) -> io::Result<()> {
-        let mut output_file = File::create(output_file_path)?;
-        let header = all_nodes
+        let all_nodes = all_nodes?;
+        let all_nodes_lock = all_nodes.lock().map_err(|_| {
+            io::Error::new(io::ErrorKind::Other, "Mutex is poisoned")
+        })?;
+        let headers = all_nodes_lock
             .iter()
             .map(|i| i.1.clone())
             .collect::<Vec<String>>();
-        writeln!(output_file, "node\t{}", header.join("\t"))?;
 
-        let mut all_unique_nodes: HashSet<usize> = HashSet::new();
-        for (_, _, nodes_set) in all_nodes.iter() {
-            all_unique_nodes.extend(nodes_set);
-        }
-        for node in &all_unique_nodes {
+        let output_file = File::create(output_file_path)?;
+        let mut writer = BufWriter::new(output_file);
+
+        // Write header
+        writeln!(writer, "node\t{}", headers.join("\t"))?;
+
+        let all_unique_nodes: Vec<usize> = all_nodes_lock
+            .iter()
+            .flat_map(|(_, _, nodes_set)| nodes_set)
+            .cloned()
+            .collect();
+        // all_unique_nodes.sort_unstable();
+
+        // Iterate over each unique node and write line by line
+        for node in all_unique_nodes {
             let mut line = vec![node.to_string()];
-            for (_, _, nodes_set) in all_nodes.iter() {
+            for (_, _, nodes_set) in &*all_nodes_lock {
                 line.push(
-                    if nodes_set.contains(node) { "1" } else { "0" }
+                    if nodes_set.contains(&node) { "1" } else { "0" }
                         .to_string(),
                 );
             }
-            writeln!(output_file, "{}", line.join("\t"))?;
+            writeln!(writer, "{}", line.join("\t"))?;
         }
 
+        writer.flush()?;
         Ok(())
     }
 }

@@ -439,9 +439,8 @@ fn main() -> io::Result<()> {
         Subcli::rmerge { input, prefix } => {
             let fig = rmerge::Samples::from_paths(input)?;
             fig.validate_paths()?;
-            let a: Vec<(String, String, HashSet<usize>)> =
-                fig.path_to_sets()?;
-            fig.merge_write(a, &prefix)?;
+            let a = fig.path_to_sets()?;
+            fig.merge_write(Ok(a), &prefix)?;
         }
     }
     Ok(())
