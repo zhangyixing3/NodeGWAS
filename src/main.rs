@@ -8,6 +8,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
+use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
@@ -16,6 +17,7 @@ mod filter;
 mod gam;
 mod liftover;
 mod merge;
+mod rmerge;
 mod tobed;
 
 #[derive(Parser, Debug)]
@@ -42,6 +44,15 @@ struct Data {
 enum Subcli {
     /// Combine nodes files from multiple samples
     merge {
+        /// input files
+        #[arg(short = 'i', long = "intput", required = true)]
+        input: String,
+        /// output file
+        #[arg(short = 'o', long = "output", default_value = "kmer_table")]
+        prefix: String,
+    },
+    /// merge nodes files from multiple samples new version
+    rmerge {
         /// input files
         #[arg(short = 'i', long = "intput", required = true)]
         input: String,
@@ -120,7 +131,7 @@ enum Subcli {
     },
 }
 
-fn main() {
+fn main() -> io::Result<()> {
     // init log setting
     Builder::new()
         .format(|buf, record| {
@@ -425,5 +436,13 @@ fn main() {
             count::run(count_file);
             log::info!("Congratulations, it's successful!");
         }
+        Subcli::rmerge { input, prefix } => {
+            let fig = rmerge::Samples::from_paths(input)?;
+            fig.validate_paths()?;
+            let a: Vec<(String, String, HashSet<usize>)> =
+                fig.path_to_sets()?;
+            fig.merge_write(a, &prefix)?;
+        }
     }
+    Ok(())
 }
