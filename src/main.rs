@@ -17,6 +17,7 @@ mod filter;
 mod gam;
 mod liftover;
 mod merge;
+mod resource;
 mod rmerge;
 mod tobed;
 
@@ -54,11 +55,17 @@ enum Subcli {
     /// merge nodes files from multiple samples new version
     rmerge {
         /// input files
-        #[arg(short = 'i', long = "intput", required = true)]
+        #[arg(short = 'i', long = "input", required = true)]
         input: String,
         /// output file
         #[arg(short = 'o', long = "output", default_value = "kmer_table")]
         prefix: String,
+        /// is_sort [default: false]
+        #[arg(short = 's', long = "is_sort")]
+        is_sort: bool,
+        /// is_transpose [default: false]
+        #[arg(short = 't', long = "is_transpose")]
+        is_transpose: bool,
     },
     /// kmers_table to plink bed
     tobed {
@@ -436,12 +443,18 @@ fn main() -> io::Result<()> {
             count::run(count_file);
             log::info!("Congratulations, it's successful!");
         }
-        Subcli::rmerge { input, prefix } => {
+        Subcli::rmerge {
+            input,
+            prefix,
+            is_sort,
+            is_transpose,
+        } => {
             let fig = rmerge::Samples::from_paths(input)?;
             fig.validate_paths()?;
             let a = fig.path_to_sets()?;
-            fig.merge_write(Ok(a), &prefix)?;
+            fig.merge_write(Ok(a), &prefix, is_sort, is_transpose)?;
         }
     }
+    eprintln!("{}", resource::gather_app_resources()?);
     Ok(())
 }

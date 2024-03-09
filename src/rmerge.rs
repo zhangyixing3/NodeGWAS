@@ -1,8 +1,10 @@
 use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
@@ -90,9 +92,11 @@ impl Samples {
     }
     pub fn path_to_sets(
         &self,
-    ) -> io::Result<Arc<Mutex<Vec<(String, String, HashSet<usize>)>>>> {
-        let all_nodes: Arc<Mutex<Vec<(String, String, HashSet<usize>)>>> =
-            Arc::new(Mutex::new(Vec::new()));
+    ) -> io::Result<Arc<Mutex<Vec<(String, String, HashMap<usize, usize>)>>>>
+    {
+        let all_nodes: Arc<
+            Mutex<Vec<(String, String, HashMap<usize, usize>)>>,
+        > = Arc::new(Mutex::new(Vec::new()));
 
         self.paths
             .par_iter()
@@ -119,12 +123,13 @@ impl Samples {
                     };
 
                 // Iterate over the lines of the file, parsing each and collecting relevant nodes.
-                let mut nodes = HashSet::new();
+                let mut nodes = HashMap::new();
                 for line_result in reader.lines() {
                     let line = line_result?;
                     let node_data = Nodes::from_line(&line)?;
                     if node_data.count >= 2 {
-                        nodes.insert(node_data.nod);
+                        // nodes.insert(node_data.nod);
+                        nodes.insert(node_data.nod, node_data.count);
                     }
                 }
 
@@ -150,9 +155,11 @@ impl Samples {
     pub fn merge_write(
         &self,
         all_nodes: io::Result<
-            Arc<Mutex<Vec<(String, String, HashSet<usize>)>>>,
+            Arc<Mutex<Vec<(String, String, HashMap<usize, usize>)>>>,
         >,
         output_file_path: &str,
+        is_sort: bool,
+        transpose: bool,
     ) -> io::Result<()> {
         let all_nodes = all_nodes?;
         let all_nodes_lock = all_nodes.lock().map_err(|_| {
@@ -163,29 +170,47 @@ impl Samples {
             .map(|i| i.1.clone())
             .collect::<Vec<String>>();
 
-        let output_file = File::create(output_file_path)?;
-        let mut writer = BufWriter::new(output_file);
+        let output_file = File::create(format!("{}.gz", output_file_path))?;
+        let encoder = GzEncoder::new(output_file, Compression::default());
+        let mut writer = BufWriter::new(encoder);
 
         // Write header
         writeln!(writer, "node\t{}", headers.join("\t"))?;
 
-        let all_unique_nodes: Vec<usize> = all_nodes_lock
+        let mut all_unique_nodes: Vec<usize> = all_nodes_lock
             .iter()
-            .flat_map(|(_, _, nodes_set)| nodes_set)
+            .flat_map(|(_, _, nodes_set)| nodes_set.keys())
             .cloned()
             .collect();
-        // all_unique_nodes.sort_unstable();
-
+        if is_sort {
+            all_unique_nodes.sort_unstable();
+        }
         // Iterate over each unique node and write line by line
-        for node in all_unique_nodes {
-            let mut line = vec![node.to_string()];
-            for (_, _, nodes_set) in &*all_nodes_lock {
-                line.push(
-                    if nodes_set.contains(&node) { "1" } else { "0" }
-                        .to_string(),
-                );
+        if transpose {
+            for node in all_unique_nodes {
+                let mut line = node.to_string();
+                for (_, _, nodes_set) in &*all_nodes_lock {
+                    line.push('\t');
+                    let presence = if nodes_set.contains_key(&node) {
+                        '1'
+                    } else {
+                        '0'
+                    };
+                    line.push(presence);
+                }
+                writeln!(writer, "{}", line)?;
             }
-            writeln!(writer, "{}", line.join("\t"))?;
+        } else {
+            for node in all_unique_nodes {
+                let mut line = node.to_string();
+                for (_, _, nodes_set) in &*all_nodes_lock {
+                    line.push('\t');
+                    line += &nodes_set
+                        .get(&node)
+                        .map_or("0".to_string(), |v| v.to_string());
+                }
+                writeln!(writer, "{}", line)?;
+            }
         }
 
         writer.flush()?;

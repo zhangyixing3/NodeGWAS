@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0.18", features = ["derive"] }
-
 log = "0.4"
 env_logger = "0.10.0"
 chrono = "0.4.24"
@@ -18,3 +17,6 @@ rayon = "1.8.0"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0"
 flate2 = "1.0"
+ctor = "0.2.7"
+lazy_static = "1.4.0"
+libc = "0.2.135"
