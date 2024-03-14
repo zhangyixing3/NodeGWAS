@@ -1,7 +1,22 @@
+use ctor::ctor;
+use lazy_static::lazy_static;
 use libc::{getrusage, rusage, RUSAGE_SELF};
 use std::{env, fmt, io, mem::MaybeUninit, result, time::Instant};
 
 type Result<T> = result::Result<T, io::Error>;
+
+lazy_static! {
+    static ref NOW: Instant = Instant::now();
+}
+
+#[ctor]
+fn init_now() {
+    lazy_static::initialize(&NOW);
+}
+
+pub fn realtime() -> u64 {
+    NOW.elapsed().as_secs()
+}
 
 struct AppResources {
     start_time: Instant,
@@ -30,10 +45,6 @@ impl AppResources {
         Ok(r.ru_utime.tv_sec + r.ru_stime.tv_sec)
     }
 
-    fn realtime(&self) -> u64 {
-        self.start_time.elapsed().as_secs()
-    }
-
     fn peakrss(&self) -> Result<i64> {
         let r = unsafe {
             let mut r = MaybeUninit::uninit();
@@ -52,7 +63,7 @@ impl fmt::Display for AppResources {
             f,
             "CMD: {}\nReal time: {} sec; CPU: {} sec; Peak RSS: {:.3} GB",
             self.command_line,
-            self.realtime(),
+            realtime(),
             self.cputime().unwrap_or_default(),
             self.peakrss().unwrap_or_default() as f64 / 1024.0 / 1024.0,
         )
