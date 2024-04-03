@@ -11,7 +11,7 @@ The workflow begins with the input data:
 ```
 vg filter ../Yunzhe-94-343.gam -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x ROC22.anchorwave.xg > Yunzhe-94-343.filtered.gam
 ```
-- **.filtered.gam** : These files contain the alignment information.
+- **Sample.filtered.gam** : These files contain the alignment information.
 - **graph** :  The graph pangenome.
 
 ## 2.Create Node Table
@@ -20,10 +20,22 @@ Next, Extract the alignment information from each sample and compile it into a t
 
 - **Accessions**: accessions or samples in the study.
 - **Nodes**:  nodes within the graph pangenome.
-- The table represents the presence or absence of nodes in the population.
+
 ```
-to do
+$ nodegwas merge -h
+merge nodes files from multiple samples
+Usage: nodegwas merge [OPTIONS] --input <INPUT>
+
+Options:
+  -i, --input <INPUT>    input files
+  -o, --output <PREFIX>  output file [default: kmer_table]
+  -s, --is_sort          is_sort [default: false]
+  -t, --is_transpose     is_transpose [default: false]
+  -h, --help             Print help
+
 ```
+is_sort: If true, sort the table by nodes.The disadvantage is that it may require additional time and memory
+is_transpose: If true, transpose the table.Transforms the number of alignments into 0/1 values, where 1 indicates presence of the node in the sample.
 
 
 ## 3.Run GWAS analysis
