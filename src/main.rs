@@ -349,7 +349,7 @@ fn main() -> io::Result<()> {
             }
 
             // check sample information
-            let sample_len = sample.len();
+            let sample_len = sample.len() - 1;
             if sample_len == 0 {
                 panic!("Error: We can't find sample")
             } else {
@@ -361,7 +361,7 @@ fn main() -> io::Result<()> {
             let reader = BufReader::new(f);
             let second_reader: std::iter::Skip<io::Lines<BufReader<File>>> =
                 reader.lines().skip(1);
-            let mut genotype =
+            let genotype =
                 tobed::get_matrix(second_reader, sample_len, &mut snp_id)?;
 
             let arr: ndarray::ArrayBase<
@@ -370,7 +370,7 @@ fn main() -> io::Result<()> {
             > = tobed::vec2arr(genotype);
             log::info!("Successfully converted Vec to Array");
             log::info!("Begin write to {}...", prefix);
-            tobed::write2bed(&prefix, &sample[1..], &snp_id, arr);
+            let _ = tobed::write2bed(&prefix, &sample[1..], &snp_id, arr);
             log::info!("Congratulations, it's successful!");
         }
         Subcli::extract { graph, node } => {
