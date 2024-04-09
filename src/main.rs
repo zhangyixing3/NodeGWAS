@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use chrono::Local;
 use clap::Parser;
 use core::panic;
@@ -331,9 +332,8 @@ fn main() -> io::Result<()> {
         Subcli::tobed { input, prefix } => {
             let sample: Vec<String>;
             let mut snp_id: Vec<String> = Vec::new();
-            let mut genotype: Vec<Vec<i8>> = Vec::new();
 
-            let f: File = File::open(&input).expect("open inuput file error");
+            let f: File = File::open(&input)?;
             let reader = BufReader::new(f);
 
             let first_line: Option<Result<String, std::io::Error>> =
@@ -357,25 +357,20 @@ fn main() -> io::Result<()> {
             }
 
             log::info!("Open {} again.", &input);
-            let f: File = File::open(input).expect("open input file error");
+            let f: File = File::open(input)?;
             let reader = BufReader::new(f);
-            let second_reader: std::iter::Skip<
-                std::io::Lines<BufReader<File>>,
-            > = reader.lines().skip(1);
-            tobed::get_matrix(
-                &mut genotype,
-                second_reader,
-                sample_len,
-                &mut snp_id,
-            );
+            let second_reader: std::iter::Skip<io::Lines<BufReader<File>>> =
+                reader.lines().skip(1);
+            let mut genotype =
+                tobed::get_matrix(second_reader, sample_len, &mut snp_id)?;
 
             let arr: ndarray::ArrayBase<
-                ndarray::OwnedRepr<i8>,
+                ndarray::OwnedRepr<f32>,
                 ndarray::Dim<[usize; 2]>,
             > = tobed::vec2arr(genotype);
             log::info!("Successfully converted Vec to Array");
             log::info!("Begin write to {}...", prefix);
-            tobed::write2bed(prefix, sample, &snp_id, arr);
+            tobed::write2bed(&prefix, &sample[1..], &snp_id, arr);
             log::info!("Congratulations, it's successful!");
         }
         Subcli::extract { graph, node } => {
