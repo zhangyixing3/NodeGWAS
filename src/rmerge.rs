@@ -4,11 +4,12 @@ use flate2::Compression;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
-use std::collections::HashMap;
+use rayon::ThreadPoolBuilder;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+
 /// Represents a collection of file paths and corresponding headers.
 pub struct Samples {
     paths: Vec<String>,
@@ -18,7 +19,7 @@ pub struct Samples {
 /// nodes counts result
 pub struct Nodes {
     nod: usize,
-    count: usize,
+    count: u32,
 }
 impl Nodes {
     pub fn from_line(line: &str) -> Result<Self, std::io::Error> {
@@ -33,10 +34,10 @@ impl Nodes {
         let nod = parts[0].parse::<usize>().map_err(|_| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                "Invalid node value",
+                "Invalid node ID",
             )
         })?;
-        let count = parts[1].parse::<usize>().map_err(|_| {
+        let count = parts[1].parse::<u32>().map_err(|_| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "Invalid count value",
@@ -69,6 +70,42 @@ impl Samples {
         Ok(())
     }
 
+    pub fn max_value(&self) -> Option<u64> {
+        let vals: Vec<Option<u64>> = self
+            .paths
+            .par_iter()
+            .map(|path| {
+                // if file not exist, return None
+                let file = File::open(path).ok()?;
+                let reader = BufReader::new(file);
+                let mut local_max = 0;
+
+                for line in reader.lines() {
+                    let line = line.ok()?;
+                    let parts: Vec<&str> =
+                        line.trim().split_whitespace().collect();
+                    if let Some(count) =
+                        parts.get(1).and_then(|c| c.parse::<u64>().ok())
+                    {
+                        if count > local_max {
+                            local_max = count;
+                        }
+                    }
+                }
+                Some(local_max) // return None if file not exist
+            })
+            .collect();
+        let mut max_val = 0_u64;
+        for val in vals {
+            if let Some(v) = val {
+                if v > max_val {
+                    max_val = v;
+                }
+            }
+        }
+        Some(max_val)
+    }
+
     /// Constructs a `Samples` instance from a given file, parsing paths and headers.
     pub fn from_paths<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let file = File::open(path)?;
@@ -92,73 +129,77 @@ impl Samples {
     }
     pub fn path_to_sets(
         &self,
-    ) -> io::Result<Arc<Mutex<Vec<(String, String, HashMap<usize, usize>)>>>>
-    {
-        let all_nodes: Arc<
-            Mutex<Vec<(String, String, HashMap<usize, usize>)>>,
-        > = Arc::new(Mutex::new(Vec::new()));
+        max_val: u64,
+    ) -> io::Result<Arc<Mutex<Vec<(String, String, Vec<u32>)>>>> {
+        let all_nodes: Arc<Mutex<Vec<(String, String, Vec<u32>)>>> =
+            Arc::new(Mutex::new(Vec::with_capacity(self.paths.len())));
+        let pool = ThreadPoolBuilder::new().num_threads(10).build().unwrap();
+        let result = pool.install(|| {
+            self.paths
+                .par_iter()
+                .enumerate()
+                .try_for_each(|(index, path)| {
+                    // Obtain the header corresponding to the current file.
+                    let header = &self.headers[index];
 
-        self.paths
-            .par_iter()
-            .enumerate()
-            .try_for_each(|(index, path)| {
-                // Obtain the header corresponding to the current file.
-                let header = &self.headers[index];
-
-                // Create a Path object and attempt to open the corresponding file.
-                let path_obj = Path::new(path);
-                let file = match File::open(path_obj) {
-                    Ok(f) => f,
-                    Err(e) => return Err(e),
-                };
-
-                // Determine if the file is gzipped and create the appropriate reader.
-                let reader: Box<dyn BufRead> =
-                    if path_obj.extension().and_then(|s| s.to_str())
-                        == Some("gz")
-                    {
-                        Box::new(BufReader::new(GzDecoder::new(file)))
-                    } else {
-                        Box::new(BufReader::new(file))
+                    // Create a Path object and attempt to open the corresponding file.
+                    let path_obj = Path::new(path);
+                    let file = match File::open(path_obj) {
+                        Ok(f) => f,
+                        Err(e) => return Err(e),
                     };
 
-                // Iterate over the lines of the file, parsing each and collecting relevant nodes.
-                let mut nodes = HashMap::new();
-                for line_result in reader.lines() {
-                    let line = line_result?;
-                    let node_data = Nodes::from_line(&line)?;
-                    if node_data.count >= 2 {
-                        // nodes.insert(node_data.nod);
-                        nodes.insert(node_data.nod, node_data.count);
+                    // Determine if the file is gzipped and create the appropriate reader.
+                    let reader: Box<dyn BufRead> =
+                        if path_obj.extension().and_then(|s| s.to_str())
+                            == Some("gz")
+                        {
+                            Box::new(BufReader::new(GzDecoder::new(file)))
+                        } else {
+                            Box::new(BufReader::new(file))
+                        };
+
+                    // Iterate over the lines of the file, parsing each and collecting relevant nodes.
+                    let mut nodes: Vec<u32> =
+                        Vec::with_capacity(max_val as usize);
+                    for node in nodes.iter_mut() {
+                        *node = 0;
                     }
-                }
+                    for line_result in reader.lines() {
+                        let line = line_result?;
+                        let node_data = Nodes::from_line(&line)?;
+                        if node_data.count >= 2 {
+                            // nodes.insert(node_data.nod);
+                            nodes.insert(node_data.nod - 1, node_data.count)
+                        }
+                    }
 
-                // Safely access the shared structure to store the results.
-                let mut all_nodes_lock = all_nodes.lock().map_err(|_| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "Mutex lock error",
-                    )
-                })?;
-                all_nodes_lock.push((
-                    path.to_string(),
-                    header.to_string(),
-                    nodes,
-                ));
+                    // Safely access the shared structure to store the results.
+                    let mut all_nodes_lock =
+                        all_nodes.lock().map_err(|_| {
+                            std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                "Mutex lock error",
+                            )
+                        })?;
+                    all_nodes_lock.push((
+                        path.to_string(),
+                        header.to_string(),
+                        nodes,
+                    ));
 
-                Ok(())
-            })?;
-
+                    Ok(())
+                })
+        });
+        result?;
+        println!("finish merge");
         Ok(all_nodes)
     }
 
     pub fn merge_write(
         &self,
-        all_nodes: io::Result<
-            Arc<Mutex<Vec<(String, String, HashMap<usize, usize>)>>>,
-        >,
+        all_nodes: io::Result<Arc<Mutex<Vec<(String, String, Vec<u32>)>>>>,
         output_file_path: &str,
-        is_sort: bool,
         transpose: bool,
     ) -> io::Result<()> {
         let all_nodes = all_nodes?;
@@ -177,37 +218,25 @@ impl Samples {
         // Write header
         writeln!(writer, "node\t{}", headers.join("\t"))?;
 
-        let mut all_unique_nodes: Vec<usize> = all_nodes_lock
-            .iter()
-            .flat_map(|(_, _, nodes_set)| nodes_set.keys())
-            .cloned()
-            .collect();
-        if is_sort {
-            all_unique_nodes.sort_unstable();
-        }
-        // Iterate over each unique node and write line by line
+        let max_val = all_nodes_lock[0].2.len();
+
         if transpose {
-            for node in all_unique_nodes {
-                let mut line = node.to_string();
+            for index in 0..max_val {
+                let mut line = index.to_string();
                 for (_, _, nodes_set) in &*all_nodes_lock {
                     line.push('\t');
-                    let presence = if nodes_set.contains_key(&node) {
-                        '1'
-                    } else {
-                        '0'
-                    };
+                    let presence = if nodes_set[index] > 0 { '1' } else { '0' };
                     line.push(presence);
                 }
                 writeln!(writer, "{}", line)?;
             }
         } else {
-            for node in all_unique_nodes {
-                let mut line = node.to_string();
+            for index in 0..max_val {
+                let mut line = index.to_string();
                 for (_, _, nodes_set) in &*all_nodes_lock {
                     line.push('\t');
-                    line += &nodes_set
-                        .get(&node)
-                        .map_or("0".to_string(), |v| v.to_string());
+                    let tem = nodes_set[index].to_string();
+                    line += &tem;
                 }
                 writeln!(writer, "{}", line)?;
             }

@@ -1,6 +1,6 @@
 use bed_reader::BedErrorPlus;
 use bed_reader::WriteOptions;
-use core::f32;
+
 use ndarray::Array2;
 use std::io::BufReader;
 use std::{fs::File, io};

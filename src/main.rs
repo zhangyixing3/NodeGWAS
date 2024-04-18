@@ -61,9 +61,6 @@ enum Subcli {
         /// output file
         #[arg(short = 'o', long = "output", default_value = "kmer_table")]
         prefix: String,
-        /// is_sort [default: false]
-        #[arg(short = 's', long = "is_sort")]
-        is_sort: bool,
         /// is_transpose [default: false]
         #[arg(short = 't', long = "is_transpose")]
         is_transpose: bool,
@@ -441,13 +438,14 @@ fn main() -> io::Result<()> {
         Subcli::rmerge {
             input,
             prefix,
-            is_sort,
             is_transpose,
         } => {
             let fig = rmerge::Samples::from_paths(input)?;
             fig.validate_paths()?;
-            let a = fig.path_to_sets()?;
-            fig.merge_write(Ok(a), &prefix, is_sort, is_transpose)?;
+            let max_val: u64 = fig.max_value().expect("max value error");
+
+            let a = fig.path_to_sets(max_val)?;
+            fig.merge_write(Ok(a), &prefix, is_transpose)?;
         }
     }
     eprintln!("{}", resource::gather_app_resources()?);
