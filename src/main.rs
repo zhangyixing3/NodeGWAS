@@ -142,10 +142,10 @@ fn main() -> io::Result<()> {
         .format(|buf, record| {
             let level = { buf.default_styled_level(record.level()) };
             let mut style = buf.style();
-            style.set_bold(true); //https://docs.rs/env_logger/0.10.0/env_logger/fmt/struct.Style.html
+            style.set_bold(false); //https://docs.rs/env_logger/0.10.0/env_logger/fmt/struct.Style.html
             writeln!(
                 buf,
-                "{}\t[{}]\t{}",
+                "{}[{}]\t{}",
                 //    Local::now().format("%Y/%m/%d %H:%M:%S"),
                 style.value(Local::now().format("%Y/%m/%d %H:%M:%S")),
                 level,
@@ -442,9 +442,11 @@ fn main() -> io::Result<()> {
         } => {
             let fig = rmerge::Samples::from_paths(input)?;
             fig.validate_paths()?;
-            let max_val: u64 = fig.max_value().expect("max value error");
-
+            log::info!("all samples path is valid !");
+            let max_val: usize = fig.max_value().expect("max value error");
+            log::info!("The max Node Id value is {}", max_val);
             let a = fig.path_to_sets(max_val)?;
+            log::info!("all samples have been converted to memory !");
             fig.merge_write(Ok(a), &prefix, is_transpose)?;
         }
     }

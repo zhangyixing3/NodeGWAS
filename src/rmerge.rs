@@ -6,9 +6,16 @@ use rayon::iter::{
 };
 use rayon::ThreadPoolBuilder;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+
+fn gzip_true(filepath: &str) -> io::Result<bool> {
+    let mut infile = File::open(filepath)?;
+    let mut buf = [0u8; 2];
+    infile.read_exact(&mut buf)?;
+    Ok(buf[0] == 31 && buf[1] == 139)
+}
 
 /// Represents a collection of file paths and corresponding headers.
 pub struct Samples {
@@ -70,14 +77,19 @@ impl Samples {
         Ok(())
     }
 
-    pub fn max_value(&self) -> Option<u64> {
-        let vals: Vec<Option<u64>> = self
+    pub fn max_value(&self) -> Option<usize> {
+        let vals: Vec<Option<usize>> = self
             .paths
             .par_iter()
             .map(|path| {
                 // if file not exist, return None
                 let file = File::open(path).ok()?;
-                let reader = BufReader::new(file);
+                let reader: Box<dyn BufRead> =
+                    if gzip_true(path).expect("Failed to check gzip") {
+                        Box::new(BufReader::new(GzDecoder::new(file)))
+                    } else {
+                        Box::new(BufReader::new(file))
+                    };
                 let mut local_max = 0;
 
                 for line in reader.lines() {
@@ -85,22 +97,24 @@ impl Samples {
                     let parts: Vec<&str> =
                         line.trim().split_whitespace().collect();
                     if let Some(count) =
-                        parts.get(1).and_then(|c| c.parse::<u64>().ok())
+                        parts.get(0).and_then(|c| c.parse::<usize>().ok())
                     {
                         if count > local_max {
                             local_max = count;
+                            // println!("{}", local_max);
                         }
                     }
                 }
                 Some(local_max) // return None if file not exist
             })
             .collect();
-        let mut max_val = 0_u64;
+        let mut max_val = 0_usize;
         for val in vals {
             if let Some(v) = val {
                 if v > max_val {
                     max_val = v;
                 }
+
             }
         }
         Some(max_val)
@@ -129,7 +143,7 @@ impl Samples {
     }
     pub fn path_to_sets(
         &self,
-        max_val: u64,
+        max_val: usize,
     ) -> io::Result<Arc<Mutex<Vec<(String, String, Vec<u32>)>>>> {
         let all_nodes: Arc<Mutex<Vec<(String, String, Vec<u32>)>>> =
             Arc::new(Mutex::new(Vec::with_capacity(self.paths.len())));
@@ -151,26 +165,21 @@ impl Samples {
 
                     // Determine if the file is gzipped and create the appropriate reader.
                     let reader: Box<dyn BufRead> =
-                        if path_obj.extension().and_then(|s| s.to_str())
-                            == Some("gz")
-                        {
+                        if gzip_true(path).expect("Failed to check gzip") {
                             Box::new(BufReader::new(GzDecoder::new(file)))
                         } else {
                             Box::new(BufReader::new(file))
                         };
 
                     // Iterate over the lines of the file, parsing each and collecting relevant nodes.
-                    let mut nodes: Vec<u32> =
-                        Vec::with_capacity(max_val as usize);
-                    for node in nodes.iter_mut() {
-                        *node = 0;
-                    }
+                    let mut nodes = vec![0; max_val];
                     for line_result in reader.lines() {
                         let line = line_result?;
                         let node_data = Nodes::from_line(&line)?;
                         if node_data.count >= 2 {
                             // nodes.insert(node_data.nod);
-                            nodes.insert(node_data.nod - 1, node_data.count)
+                            // println!("{} {}", node_data.nod, node_data.count);
+                            nodes[node_data.nod - 1] =  node_data.count;
                         }
                     }
 
@@ -192,7 +201,7 @@ impl Samples {
                 })
         });
         result?;
-        println!("finish merge");
+        println!("finish merge...");
         Ok(all_nodes)
     }
 
