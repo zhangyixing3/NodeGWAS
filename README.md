@@ -16,10 +16,12 @@ The workflow begins with the input data:
 
 
 ```
-vg filter ../Yunzhe-94-343.gam -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x ROC22.anchorwave.xg > Yunzhe-94-343.filtered.gam
+vg filter input_gam/AH1803.gam -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x Srufi.combined.giraffe.xg  |
+vg view -aM - | nodegwas count -n input_gam/AH1803.filter.node
 ```
-- **Sample.filtered.gam** : These files contain the alignment information.
-- **graph** :  The graph pangenome.
+- **AH1803.gam** : vg graph alignment format
+- **Srufi.combined.giraffe.xg** :  The graph pangenome.
+- The output file **AH1803.filter.node.gz** records the occurrence count of each node
 
 ### 2.Create Node Table
 
@@ -62,4 +64,4 @@ Nodegwas liftover  -g  ROC22.anchorwave.giraffe.gfa -o ROC22
 ```
 **Features:**
 - [x] Able to record the memory consumption and CPU time
-- [x] Able to utilize multi-threading acceleration with the Rayon library
+- [x] Able to use multi-threading acceleration with the Rayon library
