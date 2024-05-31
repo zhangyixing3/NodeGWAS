@@ -114,7 +114,6 @@ impl Samples {
                 if v > max_val {
                     max_val = v;
                 }
-
             }
         }
         Some(max_val)
@@ -179,7 +178,7 @@ impl Samples {
                         if node_data.count >= 2 {
                             // nodes.insert(node_data.nod);
                             // println!("{} {}", node_data.nod, node_data.count);
-                            nodes[node_data.nod - 1] =  node_data.count;
+                            nodes[node_data.nod - 1] = node_data.count;
                         }
                     }
 

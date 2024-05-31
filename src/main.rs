@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use core::panic;
@@ -14,6 +14,7 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
 mod count;
+mod extract;
 mod filter;
 mod gam;
 mod liftover;
@@ -371,50 +372,8 @@ fn main() -> io::Result<()> {
             log::info!("Congratulations, it's successful!");
         }
         Subcli::extract { graph, node } => {
-            let f = File::open(graph).expect("open file failed");
-            let mut node = File::create(node).expect("create output fail");
-            let mut tem: HashSet<String> = HashSet::new();
-            let reader = BufReader::new(f);
-
-            for line in reader.lines() {
-                let line = line.expect("read line failed");
-                // gfa format Walk line
-                if line.starts_with('W') {
-                    let line_l: Vec<&str> =
-                        line.trim().split_whitespace().collect();
-                    let haptype: &str = line_l[3];
-                    let node_s: &str = line_l[6];
-
-                    for i in node_s.split('>') {
-                        if i.is_empty() {
-                            continue;
-                        }
-
-                        if !tem.contains(i) {
-                            let haptype = &haptype[..haptype.len() - 1];
-                            writeln!(node, "{}\t{}", i, haptype)
-                                .expect("write failed");
-                            tem.insert(i.to_owned());
-                        }
-                    }
-                } else if line.starts_with('P') {
-                    let line_l: Vec<&str> =
-                        line.trim().split_whitespace().collect();
-                    let haptype: &str = line_l[1];
-                    let node_s: &str = line_l[2];
-                    for i in node_s.split(&['+', '-', ','][..]) {
-                        if i.is_empty() {
-                            continue;
-                        }
-                        if !tem.contains(i) {
-                            let haptype = &haptype[..haptype.len() - 1];
-                            writeln!(node, "{}\t{}", i, haptype)
-                                .expect("write failed");
-                            tem.insert(i.to_owned());
-                        }
-                    }
-                }
-            }
+            extract::run(&graph, &node);
+            log::info!("Congratulations, it's successful!");
         }
         Subcli::tonode { node_file } => {
             log::info!("file write to {}", &node_file);
