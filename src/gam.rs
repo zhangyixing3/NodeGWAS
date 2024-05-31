@@ -95,4 +95,5 @@ pub fn run(output: File) {
             }
         }
     }
+    output.flush().expect("flush failed");
 }
