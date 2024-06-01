@@ -4,6 +4,7 @@ use clap::Parser;
 use core::panic;
 use env_logger::fmt::Target;
 use env_logger::Builder;
+use flate2::bufread::GzDecoder;
 use log::LevelFilter;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -12,6 +13,7 @@ use std::fs::File;
 use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::Read;
 use std::io::Write;
 mod count;
 mod extract;
@@ -30,6 +32,7 @@ mod tobed;
     about = "kgwas, a tool for GWAS using kmers.",
     long_about = None
 )]
+
 struct Args {
     #[clap(subcommand)]
     command: Subcli,
@@ -39,7 +42,15 @@ struct Data {
     id: u32,
     new_line: String,
     tem_value: String,
-    source: u8,
+    source: u32,
+}
+
+fn gzip_true(filepath: &str) -> io::Result<bool> {
+    let mut infile = File::open(filepath)?;
+    let mut buf = [0u8; 2];
+    infile.read_exact(&mut buf)?;
+
+    Ok(buf[0] == 31 && buf[1] == 139)
 }
 
 #[derive(Parser, Debug)]
@@ -179,21 +190,31 @@ fn main() -> io::Result<()> {
             // get node INF
             let node = File::open(node).unwrap();
             let reader = BufReader::new(node);
-            let mut node_h: HashMap<String, u8> = HashMap::new();
+            let mut node_h: HashMap<String, u32> = HashMap::new();
             for line in reader.lines() {
                 let line = line.unwrap();
                 let tem_value: Vec<&str> =
                     line.trim().split_whitespace().collect();
                 node_h.insert(
                     tem_value[0].to_owned(),
-                    tem_value[1].parse::<u8>().unwrap(),
+                    tem_value[1].parse::<u32>().unwrap(),
                 );
             }
             log::info!("Get node information");
 
             log::info!("Open kmer_table");
-            let f: File = File::open(&ktable).expect("open sample file error");
-            let reader = BufReader::new(f);
+            let node_f = File::open(&ktable).expect("Failed to open file");
+            let file_reader = BufReader::new(node_f);
+
+            let reader: BufReader<Box<dyn Read>> =
+                if gzip_true(&ktable).unwrap() {
+                    BufReader::new(
+                        Box::new(GzDecoder::new(file_reader)) as Box<dyn Read>
+                    )
+                } else {
+                    BufReader::new(Box::new(file_reader) as Box<dyn Read>)
+                };
+
             let mut data_vec: Vec<Data> = Vec::new();
             let second_reader = reader.lines().skip(1);
             log::info!("kmer_table convert to vcf ...");
@@ -252,16 +273,11 @@ fn main() -> io::Result<()> {
 
             // Sort the data by id(nodes)
             data_vec.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
-            let mut grouped_data: HashMap<u8, Vec<Data>> = HashMap::new();
+            let mut grouped_data: HashMap<u32, Vec<Data>> = HashMap::new();
             for data in data_vec {
                 let entry = grouped_data.entry(data.source).or_insert(vec![]);
                 entry.push(data);
             }
-
-            // for data in data_vec {
-            //     let line = format!("{}{}\n", data.new_line, data.tem_value);
-            //     file.write_all(line.as_bytes()).unwrap();
-            // }
 
             log::info!("Write INF to the VCF.");
             grouped_data.par_iter().for_each(|(key, values)| {
@@ -269,18 +285,24 @@ fn main() -> io::Result<()> {
                 let filename = format!("{}_vcf",key);
                 let mut file = File::create(filename).expect("Failed to create file");
                             // vcf Header
-                let header = "\
-##fileformat=VCFv4.2
-##source=kgwasV1.90
-##INFO=<ID=PR,Number=0,Type=Flag,Description=\"Provisional reference allele, may not be based on real reference genome\">
-##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
+                let header = b"\
+                    ##fileformat=VCFv4.2\n\
+                    ##source=kgwasV1.90\n\
+                    ##INFO=<ID=PR,Number=0,Type=Flag,Description=\"Provisional reference allele,\
+                    may not be based on real reference genome\"\n\
+                    ##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\"\n";
                         let header1 = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
-                        file.write_all(header.as_bytes()).unwrap();
-                        let f: File = File::open(&ktable).expect("open sample file error");
-                        let reader = BufReader::new(f);
+                        file.write_all(header).unwrap();
+                        let node_f = File::open(&ktable).expect("Failed to open file");
+                        let file_reader = BufReader::new(node_f);
+                        let reader: BufReader<Box<dyn Read>> = if gzip_true(&ktable).unwrap() {
+                            BufReader::new(Box::new(GzDecoder::new(file_reader)) as Box<dyn Read>)
+                        } else {
+                            BufReader::new(Box::new(file_reader) as Box<dyn Read>)
+                        };
                         let first_line = reader.lines().next();
                         if let Some(Ok(header2)) = first_line {
-                            let header_ok = format!("{}{}{}", header1, header2, "\n");
+                            let header_ok = format!("{}{}{}", header1, &header2[5..], "\n");
                             file.write_all(header_ok.as_bytes()).unwrap();
                         } else {
                             panic!("Error: Failed to read header2 from the file.");
