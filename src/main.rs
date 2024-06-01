@@ -4,6 +4,7 @@ use clap::Parser;
 use core::panic;
 use env_logger::fmt::Target;
 use env_logger::Builder;
+use flate2::bufread::GzDecoder;
 use log::LevelFilter;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -12,6 +13,7 @@ use std::fs::File;
 use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::Read;
 use std::io::Write;
 mod count;
 mod extract;
@@ -30,6 +32,7 @@ mod tobed;
     about = "kgwas, a tool for GWAS using kmers.",
     long_about = None
 )]
+
 struct Args {
     #[clap(subcommand)]
     command: Subcli,
@@ -40,6 +43,14 @@ struct Data {
     new_line: String,
     tem_value: String,
     source: u32,
+}
+
+fn gzip_true(filepath: &str) -> io::Result<bool> {
+    let mut infile = File::open(filepath)?;
+    let mut buf = [0u8; 2];
+    infile.read_exact(&mut buf)?;
+
+    Ok(buf[0] == 31 && buf[1] == 139)
 }
 
 #[derive(Parser, Debug)]
@@ -192,8 +203,18 @@ fn main() -> io::Result<()> {
             log::info!("Get node information");
 
             log::info!("Open kmer_table");
-            let f: File = File::open(&ktable).expect("open sample file error");
-            let reader = BufReader::new(f);
+            let node_f = File::open(&ktable).expect("Failed to open file");
+            let file_reader = BufReader::new(node_f);
+
+            let reader: BufReader<Box<dyn Read>> =
+                if gzip_true(&ktable).unwrap() {
+                    BufReader::new(
+                        Box::new(GzDecoder::new(file_reader)) as Box<dyn Read>
+                    )
+                } else {
+                    BufReader::new(Box::new(file_reader) as Box<dyn Read>)
+                };
+
             let mut data_vec: Vec<Data> = Vec::new();
             let second_reader = reader.lines().skip(1);
             log::info!("kmer_table convert to vcf ...");
@@ -272,11 +293,16 @@ fn main() -> io::Result<()> {
                     ##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\"\n";
                         let header1 = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
                         file.write_all(header).unwrap();
-                        let f: File = File::open(&ktable).expect("open sample file error");
-                        let reader = BufReader::new(f);
+                        let node_f = File::open(&ktable).expect("Failed to open file");
+                        let file_reader = BufReader::new(node_f);
+                        let reader: BufReader<Box<dyn Read>> = if gzip_true(&ktable).unwrap() {
+                            BufReader::new(Box::new(GzDecoder::new(file_reader)) as Box<dyn Read>)
+                        } else {
+                            BufReader::new(Box::new(file_reader) as Box<dyn Read>)
+                        };
                         let first_line = reader.lines().next();
                         if let Some(Ok(header2)) = first_line {
-                            let header_ok = format!("{}{}{}", header1, header2, "\n");
+                            let header_ok = format!("{}{}{}", header1, &header2[5..], "\n");
                             file.write_all(header_ok.as_bytes()).unwrap();
                         } else {
                             panic!("Error: Failed to read header2 from the file.");
