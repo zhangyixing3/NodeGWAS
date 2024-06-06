@@ -19,6 +19,7 @@ pub fn realtime() -> u64 {
 }
 
 struct AppResources {
+    #[allow(dead_code)]
     start_time: Instant,
     command_line: String,
 }

@@ -6,8 +6,6 @@ use env_logger::fmt::Target;
 use env_logger::Builder;
 use flate2::bufread::GzDecoder;
 use log::LevelFilter;
-use rayon::prelude::*;
-use serde::de::value;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
@@ -37,13 +35,6 @@ mod tobed;
 struct Args {
     #[clap(subcommand)]
     command: Subcli,
-}
-
-struct Data {
-    id: u32,
-    new_line: String,
-    tem_value: String,
-    source: u32,
 }
 
 fn gzip_true(filepath: &str) -> io::Result<bool> {
@@ -273,7 +264,7 @@ fn main() -> io::Result<()> {
                         };
                         tem_value.push(allele);
                     }
-                    let mut node_source =
+                    let node_source =
                         node_h.get(&id.parse::<usize>().unwrap()).unwrap();
                     if node_source == filename {
                         let line = format!(
