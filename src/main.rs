@@ -264,9 +264,16 @@ fn main() -> io::Result<()> {
                         };
                         tem_value.push(allele);
                     }
-                    let node_source =
-                        node_h.get(&id.parse::<usize>().unwrap()).unwrap();
-                    if node_source == filename {
+                    let node_id = id.parse::<usize>().expect("id error, can't parse to usize");
+                    let node_source;
+                    if node_h.contains_key(&node_id) {
+                        node_source = node_h[&node_id];
+                    }else {
+                        log::warn!("{} not in node_h", node_id);
+                        continue;
+                    }
+
+                    if &node_source == filename {
                         let line = format!(
                             "{}\t{}{}\n",
                             node_source,
