@@ -228,9 +228,11 @@ impl Samples {
 
         let max_val = all_nodes_lock[0].2.len();
 
+        // if transpose, write node_id and presence ,1 equal to represent and 0 equal to absent
+        // if not transpose, write node_id and count
         if transpose {
             for index in 0..max_val {
-                let mut line = index.to_string();
+                let mut line = (index + 1).to_string();
                 for (_, _, nodes_set) in &*all_nodes_lock {
                     line.push('\t');
                     let presence = if nodes_set[index] > 0 { '1' } else { '0' };
@@ -240,7 +242,7 @@ impl Samples {
             }
         } else {
             for index in 0..max_val {
-                let mut line = index.to_string();
+                let mut line = (index + 1).to_string();
                 for (_, _, nodes_set) in &*all_nodes_lock {
                     line.push('\t');
                     let tem = nodes_set[index].to_string();
