@@ -208,6 +208,7 @@ impl Samples {
         &self,
         all_nodes: io::Result<Arc<Mutex<Vec<(String, String, Vec<u32>)>>>>,
         output_file_path: &str,
+        num:u32,
         transpose: bool,
     ) -> io::Result<()> {
         let all_nodes = all_nodes?;
@@ -235,7 +236,8 @@ impl Samples {
                 let mut line = (index + 1).to_string();
                 for (_, _, nodes_set) in &*all_nodes_lock {
                     line.push('\t');
-                    let presence = if nodes_set[index] > 0 { '1' } else { '0' };
+                    // The count of node is greater than or equal to num, then write 1, otherwise write 0.
+                    let presence = if nodes_set[index] >= num { '1' } else { '0' };
                     line.push(presence);
                 }
                 writeln!(writer, "{}", line)?;
