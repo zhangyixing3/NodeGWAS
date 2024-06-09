@@ -54,7 +54,7 @@ enum Subcli {
         #[arg(short = 'i', long = "intput", required = true)]
         input: String,
         /// output file
-        #[arg(short = 'o', long = "output", default_value = "kmer_table")]
+        #[arg(short = 'o', long = "output", default_value = "node_table")]
         prefix: String,
     },
     /// merge nodes files from multiple samples new version
@@ -63,8 +63,11 @@ enum Subcli {
         #[arg(short = 'i', long = "input", required = true)]
         input: String,
         /// output file
-        #[arg(short = 'o', long = "output", default_value = "kmer_table")]
+        #[arg(short = 'o', long = "output", default_value = "node_table")]
         prefix: String,
+        /// value of pav
+        #[arg(short = 'n', long = "num", default_value = "2")]
+        num: u32,
         /// is_transpose [default: false]
         #[arg(short = 't', long = "is_transpose")]
         is_transpose: bool,
@@ -389,6 +392,7 @@ fn main() -> io::Result<()> {
         Subcli::rmerge {
             input,
             prefix,
+            num ,
             is_transpose,
         } => {
             let fig = rmerge::Samples::from_paths(input)?;
@@ -398,7 +402,7 @@ fn main() -> io::Result<()> {
             log::info!("The max Node Id value is {}", max_val);
             let a = fig.path_to_sets(max_val)?;
             log::info!("all samples have been converted to memory !");
-            fig.merge_write(Ok(a), &prefix, is_transpose)?;
+            fig.merge_write(Ok(a), &prefix, num,is_transpose)?;
         }
     }
     eprintln!("{}", resource::gather_app_resources()?);
