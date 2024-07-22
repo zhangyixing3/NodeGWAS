@@ -16,8 +16,8 @@ The workflow begins with the input data:
 
 
 ```
-vg filter input_gam/AH1803.gam -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x Srufi.combined.giraffe.xg  |
-vg view -aM - | nodegwas count -n input_gam/AH1803.filter.node
+(vg filter input_gam/AH1803.gam -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x Srufi.combined.giraffe.xg  |
+vg view -aM - | nodegwas count -n input_gam/AH1803.filter.node) 1>AH1803.filter.node.log 2>&1
 ```
 - **AH1803.gam** : vg graph alignment format
 - **Srufi.combined.giraffe.xg** :  The graph pangenome.
@@ -31,21 +31,18 @@ Next, Extract the alignment information from each sample and compile it into a t
 - **Nodes**:  nodes within the graph pangenome.
 
 ```
-$ nodegwas merge -h
-merge nodes files from multiple samples
-Usage: nodegwas merge [OPTIONS] --input <INPUT>
-
-Options:
-  -i, --input <INPUT>    input files
-  -o, --output <PREFIX>  output file [default: kmer_table]
-  -s, --is_sort          is_sort [default: false]
-  -t, --is_transpose     is_transpose [default: false]
-  -h, --help             Print help
-
+$ nodegwas rmerge -i sample.list -o node_table -n 2 -t
+$ head sample.list
+../nodes/10020.gam.filter.node.gz	10020
+../nodes/10022.gam.filter.node.gz	10022
+../nodes/10023.gam.filter.node.gz	10023
+../nodes/1002.gam.filter.node.gz	1002
+../nodes/1061.gam.filter.node.gz	1061
+../nodes/1062.gam.filter.node.gz	1062
 ```
-is_sort: If true, sort the table by nodes.The disadvantage is that it may require additional time and memory
-is_transpose: If true, transpose the table.Transforms the number of alignments into 0/1 values, where 1 indicates presence of the node in the sample.
+**Note** : The first column is file path, the second column is sample id in output.
 
+if use -t , The node_table only contains two number(0, 1).
 
 ### 3.Run GWAS analysis
 
