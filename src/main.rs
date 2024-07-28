@@ -21,6 +21,7 @@ mod gam;
 mod liftover;
 mod merge;
 mod resource;
+mod rliftover;
 mod rmerge;
 mod tobed;
 
@@ -132,11 +133,23 @@ enum Subcli {
         #[arg(short = 'o', long = "out", required = true)]
         output: String,
     },
-    /// coordinate conversion
+    /// coordinate conversion for vg pipeline
     liftover {
         ///  walk => path, gfa file
         #[arg(short = 'g', long = "gfa", required = true)]
         gfa: String,
+        /// position result
+        #[arg(short = 'o', long = "out", required = true)]
+        output: String,
+    },
+    /// coordinate conversion for mc pipeline
+    rliftover {
+        ///  input gfa file (1.1)
+        #[arg(short = 'g', long = "gfa", required = true)]
+        gfa: String,
+        ///  reference genome
+        #[arg(short = 'f', long = "ref", required = true)]
+        reg: String,
         /// position result
         #[arg(short = 'o', long = "out", required = true)]
         output: String,
@@ -267,11 +280,13 @@ fn main() -> io::Result<()> {
                         };
                         tem_value.push(allele);
                     }
-                    let node_id = id.parse::<usize>().expect("id error, can't parse to usize");
+                    let node_id = id
+                        .parse::<usize>()
+                        .expect("id error, can't parse to usize");
                     let node_source;
                     if node_h.contains_key(&node_id) {
                         node_source = node_h[&node_id];
-                    }else {
+                    } else {
                         log::warn!("{} not in node_h", node_id);
                         continue;
                     }
@@ -385,6 +400,11 @@ fn main() -> io::Result<()> {
             liftover::run(gfa, output);
             log::info!("Congratulations, it's successful!");
         }
+        Subcli::rliftover { gfa, reg, output } => {
+            log::info!("open {}", &gfa);
+            rliftover::run(gfa, reg, output);
+            log::info!("Congratulations, it's successful!");
+        }
         Subcli::count { count_file } => {
             count::run(count_file);
             log::info!("Congratulations, it's successful!");
@@ -392,7 +412,7 @@ fn main() -> io::Result<()> {
         Subcli::rmerge {
             input,
             prefix,
-            num ,
+            num,
             is_transpose,
         } => {
             let fig = rmerge::Samples::from_paths(input)?;
@@ -402,7 +422,7 @@ fn main() -> io::Result<()> {
             log::info!("The max Node Id value is {}", max_val);
             let a = fig.path_to_sets(max_val)?;
             log::info!("all samples have been converted to memory !");
-            fig.merge_write(Ok(a), &prefix, num,is_transpose)?;
+            fig.merge_write(Ok(a), &prefix, num, is_transpose)?;
         }
     }
     eprintln!("{}", resource::gather_app_resources()?);
