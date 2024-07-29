@@ -1,11 +1,11 @@
 use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
+use env_logger::Env;
 use core::panic;
 use env_logger::fmt::Target;
 use env_logger::Builder;
 use flate2::bufread::GzDecoder;
-use log::LevelFilter;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
@@ -158,22 +158,27 @@ enum Subcli {
 
 fn main() -> io::Result<()> {
     // init log setting
-    Builder::new()
+    Builder::from_env(Env::default().default_filter_or("Debug"))
         .format(|buf, record| {
             let level = { buf.default_styled_level(record.level()) };
             let mut style = buf.style();
-            style.set_bold(false); //https://docs.rs/env_logger/0.10.0/env_logger/fmt/struct.Style.html
+            style.set_bold(false);
             writeln!(
                 buf,
-                "{}[{}]\t{}",
-                //    Local::now().format("%Y/%m/%d %H:%M:%S"),
-                style.value(Local::now().format("%Y/%m/%d %H:%M:%S")),
+                "{} [{}]{}:{:<4} {}",
+                style.value(Local::now().format("%Y/%m/%d %H:%M")),
                 level,
+                record
+                    .file()
+                    .unwrap_or("None")
+                    .split('/')
+                    .last()
+                    .unwrap_or("None"),
+                record.line().unwrap_or(0),
                 style.value(record.args())
             )
         })
-        .target(Target::Stdout)
-        .filter(None, LevelFilter::Debug)
+        .target(Target::Stderr)
         .init();
 
     let arg: Args = Args::parse();
