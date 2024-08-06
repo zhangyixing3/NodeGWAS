@@ -1,10 +1,10 @@
 use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
-use env_logger::Env;
 use core::panic;
 use env_logger::fmt::Target;
 use env_logger::Builder;
+use env_logger::Env;
 use flate2::bufread::GzDecoder;
 use std::collections::HashMap;
 use std::collections::HashSet;
