@@ -94,7 +94,7 @@ pub fn run(output: String) {
     let mut file = File::open("/dev/stdin").expect("Failed to open stdin");
     // Start the processor threads
     // https://github.com/Naveenaidu/rust-1brc/blob/main/src/main.rs#L104-154
-    let (sender, receiver) = crossbeam_channel::bounded::<Box<[u8]>>(20);
+    let (sender, receiver) = crossbeam_channel::bounded::<Box<[u8]>>(1000);
     // let n_threads = std::thread::available_parallelism().unwrap().into();
     let mut handles = Vec::with_capacity(THRED_NUM);
     for _ in 0..THRED_NUM {
