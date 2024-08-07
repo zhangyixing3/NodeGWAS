@@ -1,7 +1,7 @@
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use memchr::memrchr;
 use memchr::memchr;
+use memchr::memrchr;
 use serde::Deserialize;
 use serde_json::from_slice;
 use std::collections::HashMap;
@@ -45,15 +45,15 @@ fn process_chunk(data: &[u8], result: &mut Vec<usize>) {
 
         // // Parse JSON from line
         if let Ok(fstruct) = from_slice::<FStruct>(line) {
-                for mapping in fstruct.path.mapping.iter().flatten() {
-                    if let Some(tem) = &mapping.edit {
-                        if tem.iter().any(|item| is_valid_item(item)) {
-                            continue;
-                        } else {
-                            process_position(&mapping.position, result);
-                        }
+            for mapping in fstruct.path.mapping.iter().flatten() {
+                if let Some(tem) = &mapping.edit {
+                    if tem.iter().any(|item| is_valid_item(item)) {
+                        continue;
+                    } else {
+                        process_position(&mapping.position, result);
                     }
                 }
+            }
         }
     }
 }
