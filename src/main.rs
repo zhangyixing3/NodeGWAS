@@ -423,7 +423,7 @@ fn main() -> io::Result<()> {
             let fig = rmerge::Samples::from_paths(input)?;
             fig.validate_paths()?;
             log::info!("all samples path is valid !");
-            let max_val: usize = fig.max_value().expect("max value error");
+            let max_val: usize = fig.max_value();
             log::info!("The max Node Id value is {}", max_val);
             let a = fig.path_to_sets(max_val)?;
             log::info!("all samples have been converted to memory !");
