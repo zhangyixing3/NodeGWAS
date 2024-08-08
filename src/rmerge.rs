@@ -88,7 +88,7 @@ impl Samples {
                 for line in reader.byte_lines() {
                     let line = line.ok().unwrap();
                     let left = line.iter().position(|&b| b == b'\t').unwrap();
-                    let b = &line[left + 1..];
+                    let b = &line[..left];
                     if a.len() < b.len() {
                         a = b.to_vec();
                     } else if a.len() == b.len() {
