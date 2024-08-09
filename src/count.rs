@@ -4,7 +4,8 @@ use memchr::memchr;
 use memchr::memrchr;
 use serde::Deserialize;
 use serde_json::from_slice;
-use std::collections::HashMap;
+use nohash::NoHashHasher;
+use std::{collections::HashMap, hash::BuildHasherDefault};
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -147,7 +148,9 @@ pub fn run(output: String) {
     drop(sender);
 
     // count the number of nodes and repeats
-    let mut nodes: HashMap<usize, usize> = HashMap::new();
+    // use nohash instead of default hasher
+    // let mut nodes: HashMap<usize, usize> = HashMap::new();
+    let mut nodes: HashMap<usize, usize, BuildHasherDefault<NoHashHasher<usize>>> = HashMap::default();
     for handle in handles {
         let sub_result = handle.join().unwrap();
         for number in sub_result {
