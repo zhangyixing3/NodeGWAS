@@ -2,13 +2,13 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use memchr::memchr;
 use memchr::memrchr;
+use nohash::NoHashHasher;
 use serde::Deserialize;
 use serde_json::from_slice;
-use nohash::NoHashHasher;
-use std::{collections::HashMap, hash::BuildHasherDefault};
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
+use std::{collections::HashMap, hash::BuildHasherDefault};
 
 const READ_BUF_SIZE: usize = 512 * 1024; //  512 KiB
 const THRED_NUM: usize = 5; // number of threads to use
@@ -150,7 +150,11 @@ pub fn run(output: String) {
     // count the number of nodes and repeats
     // use nohash instead of default hasher
     // let mut nodes: HashMap<usize, usize> = HashMap::new();
-    let mut nodes: HashMap<usize, usize, BuildHasherDefault<NoHashHasher<usize>>> = HashMap::default();
+    let mut nodes: HashMap<
+        usize,
+        usize,
+        BuildHasherDefault<NoHashHasher<usize>>,
+    > = HashMap::default();
     for handle in handles {
         let sub_result = handle.join().unwrap();
         for number in sub_result {

@@ -85,39 +85,49 @@ impl Samples {
                         Box::new(BufReader::new(file))
                     };
                 let mut a: Vec<u8> = vec![49];
+                let mut max_sample: Vec<u8> = vec![];
                 for line in reader.byte_lines() {
                     let line = line.ok().unwrap();
                     let left = line.iter().position(|&b| b == b'\t').unwrap();
                     let b = &line[..left];
-                    if a.len() < b.len() {
-                        a = b.to_vec();
-                    } else if a.len() == b.len() {
-                        for (byte_a, byte_b) in a.iter().zip(b.iter()) {
-                            if byte_a < byte_b {
-                                a = b.to_vec();
-                                break;
-                            }
-                        }
+                    if b.len() > max_sample.len() || b > &max_sample[..] {
+                        max_sample = b.to_vec();
                     }
+                    // if a.len() < b.len() {
+                    //     a = b.to_vec();
+                    // } else if a.len() == b.len() {
+                    //     for (byte_a, byte_b) in a.iter().zip(b.iter()) {
+                    //         if byte_a < byte_b {
+                    //             a = b.to_vec();
+                    //             break;
+                    //         }
+                    //     }
+                    // }
                 }
                 a
             })
             .collect();
-        let mut a: Vec<u8> = vec![49];
+        // let mut a: Vec<u8> = vec![49];
+        // for b in vals {
+        //     if a.len() < b.len() {
+        //         a = b.to_vec();
+        //     } else if a.len() == b.len() {
+        //         for (byte_a, byte_b) in a.iter().zip(b.iter()) {
+        //             if byte_a < byte_b {
+        //                 a = b.to_vec();
+        //                 break;
+        //             }
+        //         }
+        //     }
+        // }
+        let mut max_value: Vec<u8> = vec![];
         for b in vals {
-            if a.len() < b.len() {
-                a = b.to_vec();
-            } else if a.len() == b.len() {
-                for (byte_a, byte_b) in a.iter().zip(b.iter()) {
-                    if byte_a < byte_b {
-                        a = b.to_vec();
-                        break;
-                    }
-                }
+            if b.len() > max_value.len() || &b[..] > &max_value[..] {
+                max_value = b;
             }
         }
         let mut result = 0_usize;
-        for &i in a.iter() {
+        for &i in max_value.iter() {
             result = result * 10 + (i - b'0') as usize;
         }
         result
