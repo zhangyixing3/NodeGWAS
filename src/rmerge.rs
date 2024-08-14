@@ -84,7 +84,6 @@ impl Samples {
                     } else {
                         Box::new(BufReader::new(file))
                     };
-                let mut a: Vec<u8> = vec![49];
                 let mut max_sample: Vec<u8> = vec![];
                 for line in reader.byte_lines() {
                     let line = line.ok().unwrap();
@@ -104,7 +103,7 @@ impl Samples {
                     //     }
                     // }
                 }
-                a
+                max_sample
             })
             .collect();
         // let mut a: Vec<u8> = vec![49];
