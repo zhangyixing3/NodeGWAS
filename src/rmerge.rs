@@ -89,8 +89,12 @@ impl Samples {
                     let line = line.ok().unwrap();
                     let left = line.iter().position(|&b| b == b'\t').unwrap();
                     let b = &line[..left];
-                    if b.len() > max_sample.len() || b > &max_sample[..] {
+                    if  b.len() > max_sample.len() {
                         max_sample = b.to_vec();
+                    } else if b.len() == max_sample.len() {
+                        if b > &max_sample[..] {
+                            max_sample = b.to_vec();
+                        }
                     }
                     // if a.len() < b.len() {
                     //     a = b.to_vec();
@@ -121,8 +125,12 @@ impl Samples {
         // }
         let mut max_value: Vec<u8> = vec![];
         for b in vals {
-            if b.len() > max_value.len() || &b[..] > &max_value[..] {
+            if b.len() > max_value.len(){
                 max_value = b;
+            }else if b.len() == max_value.len() {
+                if &b[..] > &max_value[..]{
+                    max_value = b;
+                }
             }
         }
         let mut result = 0_usize;
