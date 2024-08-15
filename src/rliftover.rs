@@ -1,14 +1,13 @@
 use bstr::io::BufReadExt;
-use std::{
-    collections::HashMap,
-    io::{BufReader, Write},
-};
+use std::io::{BufReader, Write};
+use nohash::{BuildNoHashHasher, NoHashHasher};
+use std::{collections::HashMap, hash::BuildHasherDefault};
 
-pub fn u8_slice_to_u32(slice: &[u8]) -> u32 {
-    let mut num: u32 = 0;
+pub fn u8_slice_to_u32(slice: &[u8]) -> usize {
+    let mut num: usize = 0;
 
     for &b in slice {
-        num = num * 10 + (b - b'0') as u32;
+        num = num * 10 + (b - b'0') as usize;
     }
     num
 }
@@ -23,7 +22,9 @@ pub fn run(gfa: String, reg: String, out: String) {
     // open gfa file and read line by line
     let f = std::fs::File::open(&gfa).expect("unable to open file");
     let reader = BufReader::new(f);
-    let mut node_length = HashMap::new();
+    // let mut node_length = HashMap::with_capacity(100000);
+    let mut node_length: HashMap<usize, u32, BuildHasherDefault<NoHashHasher<usize>>> =
+        HashMap::with_capacity_and_hasher(100000, BuildNoHashHasher::default());
     let mut walks: Vec<Walk> = Vec::new();
     for line in reader.byte_lines() {
         let line = line.unwrap();
@@ -31,10 +32,10 @@ pub fn run(gfa: String, reg: String, out: String) {
             let mut fields = line.split(|&b| b == b'\t');
             let _s = fields.next().unwrap();
             let seq_name = fields.next().unwrap();
-            let seq_len: usize = fields.next().unwrap().to_vec().len();
-            let seq_name_u32 = u8_slice_to_u32(seq_name);
+            let seq_len: usize = fields.next().unwrap().len();
+            let seq_name_usize = u8_slice_to_u32(seq_name);
             let seq_len_u32 = seq_len as u32;
-            node_length.insert(seq_name_u32, seq_len_u32);
+            node_length.insert(seq_name_usize, seq_len_u32);
         } else if line.starts_with(b"W") {
             // deal with walks
             let mut fields = line.split(|&b| b == b'\t');
@@ -74,7 +75,9 @@ pub fn run(gfa: String, reg: String, out: String) {
         std::fs::File::create(format!("{}.node.positions", reg)).unwrap();
     let mut writer1 = std::io::BufWriter::new(output1);
     let mut current_number = Vec::new();
-    let mut ref_genome_node = HashMap::new();
+    // let mut ref_genome_node = HashMap::with_capacity(100000);
+    let mut ref_genome_node: HashMap<usize, u32, BuildHasherDefault<NoHashHasher<usize>>> =
+        HashMap::with_capacity_and_hasher(100000, BuildNoHashHasher::default());
     for walk in walks {
         let mut sum_value: u32 = 0;
         for byte in walk.unit {
@@ -127,7 +130,7 @@ pub fn run(gfa: String, reg: String, out: String) {
         if line.starts_with(b"W") {
             let mut parts = line.split(|&b| b == b'\t');
             let mut current_number = Vec::new();
-            let mut bubble: Vec<u32> = Vec::new();
+            let mut bubble: Vec<usize> = Vec::new();
             let sample = String::from_utf8(parts.nth(1).unwrap().to_vec())
                 .to_owned()
                 .expect("Failed to convert from UTF-8");
