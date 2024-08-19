@@ -6,11 +6,15 @@ use std::io::{BufReader, BufWriter, Write};
 
 fn _split_on_tab(line: &[u8]) -> impl Iterator<Item = &[u8]> {
     let mut start = 0;
+    // 1.闭包这里用move 传递所有权， 但是外部的start 一直都是0,导致最后返回一行
+    // 2.闭包这里用可变引用， 导致后面的start还是用不了。
     // let parts = memchr_iter(b'\t', line).map(|end| {
     //     let part = &line[start..end];
-    //     start = end + 1; // 直接修改外部的 `start`
+    //     start = end + 1;
     //     part
     // });
+    // parts.chain(std::iter::once(&line[start..]))
+
     let mut parts = Vec::with_capacity(10);
     for end in memchr_iter(b'\t', line) {
         let part = &line[start..end];
