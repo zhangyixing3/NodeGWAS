@@ -4,6 +4,27 @@ use std::fs::File;
 use memchr::{memchr2_iter, memchr_iter};
 use std::io::{BufReader, BufWriter, Write};
 
+fn _split_on_tab(line: &[u8]) -> impl Iterator<Item = &[u8]> {
+    let mut start = 0;
+    // 1.闭包这里用move 传递所有权， 但是外部的start 一直都是0,导致最后返回一行
+    // 2.闭包这里用可变引用， 导致后面的start还是用不了。
+    // let parts = memchr_iter(b'\t', line).map(|end| {
+    //     let part = &line[start..end];
+    //     start = end + 1;
+    //     part
+    // });
+    // parts.chain(std::iter::once(&line[start..]))
+
+    let mut parts = Vec::with_capacity(10);
+    for end in memchr_iter(b'\t', line) {
+        let part = &line[start..end];
+        parts.push(part);
+        start = end + 1;
+    }
+    parts.push(&line[start..]);
+    parts.into_iter()
+}
+
 pub fn run(graph: &str, node: &str) {
     let f = File::open(graph).expect("open file failed");
     let node = File::create(node).expect("create output fail");
@@ -20,6 +41,7 @@ pub fn run(graph: &str, node: &str) {
         // gfa format Walk line
         if line.starts_with(b"W") {
             let mut parts = line.split(|&b| b == b'\t');
+            // let mut parts = split_on_tab(line);
             let genome = parts.nth(1).unwrap();
             if genome.starts_with(b"contig") || line.starts_with(b"unitig") {
                 continue;
@@ -75,6 +97,7 @@ pub fn run(graph: &str, node: &str) {
             // }
         } else if line.starts_with(b"P") {
             let mut parts = line.split(|&b| b == b'\t');
+            // let mut parts = split_on_tab(line);  // fail to split by mmchr_iter
             let hap = parts.nth(1).unwrap();
             if hap.starts_with(b"contig") || line.starts_with(b"unitig") {
                 continue;
