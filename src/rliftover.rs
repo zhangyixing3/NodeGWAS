@@ -1,6 +1,6 @@
 use bstr::io::BufReadExt;
-use std::io::{BufReader, Write};
 use nohash::{BuildNoHashHasher, NoHashHasher};
+use std::io::{BufReader, Write};
 use std::{collections::HashMap, hash::BuildHasherDefault};
 
 pub fn u8_slice_to_u32(slice: &[u8]) -> usize {
@@ -23,8 +23,11 @@ pub fn run(gfa: String, reg: String, out: String) {
     let f = std::fs::File::open(&gfa).expect("unable to open file");
     let reader = BufReader::new(f);
     // let mut node_length = HashMap::with_capacity(100000);
-    let mut node_length: HashMap<usize, u32, BuildHasherDefault<NoHashHasher<usize>>> =
-        HashMap::with_capacity_and_hasher(100000, BuildNoHashHasher::default());
+    let mut node_length: HashMap<
+        usize,
+        u32,
+        BuildHasherDefault<NoHashHasher<usize>>,
+    > = HashMap::with_capacity_and_hasher(100000, BuildNoHashHasher::default());
     let mut walks: Vec<Walk> = Vec::new();
     for line in reader.byte_lines() {
         let line = line.unwrap();
@@ -76,8 +79,11 @@ pub fn run(gfa: String, reg: String, out: String) {
     let mut writer1 = std::io::BufWriter::new(output1);
     let mut current_number = Vec::new();
     // let mut ref_genome_node = HashMap::with_capacity(100000);
-    let mut ref_genome_node: HashMap<usize, u32, BuildHasherDefault<NoHashHasher<usize>>> =
-        HashMap::with_capacity_and_hasher(100000, BuildNoHashHasher::default());
+    let mut ref_genome_node: HashMap<
+        usize,
+        u32,
+        BuildHasherDefault<NoHashHasher<usize>>,
+    > = HashMap::with_capacity_and_hasher(100000, BuildNoHashHasher::default());
     for walk in walks {
         let mut sum_value: u32 = 0;
         for byte in walk.unit {

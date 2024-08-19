@@ -1,5 +1,7 @@
 use bstr::{io::BufReadExt, ByteSlice};
 use std::fs::File;
+// use std::intrinsics::mir::Len;
+use memchr::{memchr2_iter, memchr_iter};
 use std::io::{BufReader, BufWriter, Write};
 
 pub fn run(graph: &str, node: &str) {
@@ -17,69 +19,109 @@ pub fn run(graph: &str, node: &str) {
         // }
         // gfa format Walk line
         if line.starts_with(b"W") {
-            let line_l: Vec<&[u8]> =
-                line.trim().split(|&b| b == b'\t').collect();
-            if line_l[1].starts_with(b"contig") || line.starts_with(b"unitig") {
+            let mut parts = line.split(|&b| b == b'\t');
+            let genome = parts.nth(1).unwrap();
+            if genome.starts_with(b"contig") || line.starts_with(b"unitig") {
                 continue;
             }
-            let haptype = line_l[3];
+            let hap = parts.nth(1).unwrap();
             let mut haptype_number = Vec::new();
-            for i in haptype {
+            for i in hap {
                 if i.is_ascii_digit() {
                     haptype_number.push(*i);
                 }
             }
-            let haptype = &haptype_number;
-            let node_s = line_l[6]; // node infromation ,example => >11<12>13
-            let mut tem = Vec::new();
-            for (index, i) in node_s.iter().enumerate() {
-                if i.is_ascii_digit() {
-                    tem.push(*i);
-                    if index == node_s.len() - 1 {
-                        writer.write_all(&tem).expect("write failed");
-                        writer.write_all(b"\t").expect("write failed");
-                        writer.write_all(haptype).expect("write failed");
-                        writer.write_all(b"\n").expect("write failed");
-                    }
-                } else {
-                    if tem.len() > 0 {
-                        writer.write_all(&tem).expect("write failed");
-                        writer.write_all(b"\t").expect("write failed");
-                        writer.write_all(haptype).expect("write failed");
-                        writer.write_all(b"\n").expect("write failed");
-                        tem.clear();
-                    }
-                }
+            let nodes_vec = parts.nth(2).unwrap(); // node infromation ,example => >11<12>13
+            let nodes_vec_1 = &nodes_vec[1..];
+            let postions = memchr2_iter(b'>', b'<', &nodes_vec_1);
+            let mut left = 0_usize;
+            for index in postions {
+                let node_s = &nodes_vec_1[left..index];
+                writer
+                    .write_all(&haptype_number)
+                    .expect("haptype information write failed");
+                writer.write_all(b"\t").expect("write failed");
+                writer.write_all(node_s).expect("node write failed");
+                writer.write_all(b"\n").expect("write failed");
+                left = index + 1;
             }
+            // last node
+            let node_s = &nodes_vec_1[left..];
+            writer
+                .write_all(&haptype_number)
+                .expect("haptype information write failed");
+            writer.write_all(b"\t").expect("write failed");
+            writer.write_all(node_s).expect("node write failed");
+            writer.write_all(b"\n").expect("write failed");
+            // let mut tem = Vec::new();
+            // for (index, i) in node_s.iter().enumerate() {
+            //     if i.is_ascii_digit() {
+            //         tem.push(*i);
+            //         if index == node_s.len() - 1 {
+            //             writer.write_all(&tem).expect("write failed");
+            //             writer.write_all(b"\t").expect("write failed");
+            //             writer.write_all(haptype).expect("write failed");
+            //             writer.write_all(b"\n").expect("write failed");
+            //         }
+            //     } else {
+            //         if tem.len() > 0 {
+            //             writer.write_all(&tem).expect("write failed");
+            //             writer.write_all(b"\t").expect("write failed");
+            //             writer.write_all(haptype).expect("write failed");
+            //             writer.write_all(b"\n").expect("write failed");
+            //             tem.clear();
+            //         }
+            //     }
+            // }
         } else if line.starts_with(b"P") {
-            let line_l: Vec<&[u8]> =
-                line.trim().split(|&b| b == b'\t').collect();
-            if line_l[1].starts_with(b"contig") || line.starts_with(b"unitig") {
+            let mut parts = line.split(|&b| b == b'\t');
+            let hap = parts.nth(1).unwrap();
+            if hap.starts_with(b"contig") || line.starts_with(b"unitig") {
                 continue;
             }
-            let haptype = line_l[1];
             let mut haptype_number = Vec::new();
-            for i in haptype {
+            for i in hap {
                 if i.is_ascii_digit() {
                     haptype_number.push(*i);
                 }
             }
-            let haptype = &haptype_number;
-            let node_s = line_l[2]; // node infromation ,example => 11+,12-,13+
-            let mut tem = Vec::new();
-            for i in node_s {
-                if i.is_ascii_digit() {
-                    tem.push(*i);
-                } else {
-                    if tem.len() > 0 {
-                        writer.write_all(&tem).expect("write failed");
-                        writer.write_all(b"\t").expect("write failed");
-                        writer.write_all(haptype).expect("write failed");
-                        writer.write_all(b"\n").expect("write failed");
-                        tem.clear();
-                    }
-                }
+
+            let nodes_vec = parts.nth(0).unwrap(); // node infromation ,example => 11+,12-,13+
+            let position = memchr_iter(b',', nodes_vec);
+            let mut left = 0_usize;
+            for index in position {
+                // println!("index:{},left:{}",index,left);
+                let node_s = &nodes_vec[left..index - 1];
+                writer
+                    .write_all(&haptype_number)
+                    .expect("haptype information write failed");
+                writer.write_all(b"\t").expect("write failed");
+                writer.write_all(&node_s).expect("node write failed");
+                writer.write_all(b"\n").expect("write failed");
+                left = index + 1;
             }
+            // last node
+            let node_s = &nodes_vec[left..nodes_vec.len() - 1];
+            writer
+                .write_all(&haptype_number)
+                .expect("haptype information write failed");
+            writer.write_all(b"\t").expect("write failed");
+            writer.write_all(node_s).expect("node write failed");
+            writer.write_all(b"\n").expect("write failed");
+            // let mut tem = Vec::new();
+            // for i in node_s {
+            //     if i.is_ascii_digit() {
+            //         tem.push(*i);
+            //     } else {
+            //         if tem.len() > 0 {
+            //             writer.write_all(&tem).expect("write failed");
+            //             writer.write_all(b"\t").expect("write failed");
+            //             writer.write_all(haptype).expect("write failed");
+            //             writer.write_all(b"\n").expect("write failed");
+            //             tem.clear();
+            //         }
+            //     }
+            // }
         }
     }
     writer.flush().expect("flush failed");
@@ -113,7 +155,7 @@ mod tests {
         let mut output = String::new();
         File::open(node_path)?.read_to_string(&mut output)?;
 
-        assert_eq!(output, "11\t1\n12\t1\n13\t1\n14\t01\n15\t01\n");
+        assert_eq!(output, "1\t11\n1\t12\n1\t13\n01\t14\n01\t15\n");
 
         Ok(())
     }
@@ -138,7 +180,8 @@ mod tests {
         let mut output = String::new();
         File::open(node_path)?.read_to_string(&mut output)?;
 
-        assert_eq!(output, "11\t1\n12\t1\n13\t1\n14\t01\n15\t01\n");
+        // assert_eq!(output, "11\t1\n12\t1\n13\t1\n14\t01\n15\t01\n");
+        assert_eq!(output, "1\t11\n1\t12\n1\t13\n01\t14\n01\t15\n");
 
         Ok(())
     }
