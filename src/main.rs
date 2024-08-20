@@ -14,22 +14,12 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
-mod count;
-mod extract;
-mod filter;
-mod gam;
-mod liftover;
-mod merge;
-mod resource;
-mod rliftover;
-mod rmerge;
-mod tobed;
 
 #[derive(Parser, Debug)]
 #[command(
     author = "Zhang Yixing",
     version = "version 1.1",
-    about = "kgwas, a tool for GWAS using kmers.",
+    about = "nodegwas, a tool for GWAS using nodes.",
     long_about = None
 )]
 
