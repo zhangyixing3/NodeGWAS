@@ -14,6 +14,16 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
+use nodegwas::count;
+use nodegwas::extract;
+use nodegwas::filter;
+use nodegwas::gam;
+use nodegwas::liftover;
+use nodegwas::merge;
+use nodegwas::resource;
+use nodegwas::rliftover;
+use nodegwas::rmerge;
+use nodegwas::tobed;
 
 #[derive(Parser, Debug)]
 #[command(
