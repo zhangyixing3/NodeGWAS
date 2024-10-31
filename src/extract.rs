@@ -59,21 +59,21 @@ pub fn run(graph: &str, node: &str) {
             let mut left = 0_usize;
             for index in postions {
                 let node_s = &nodes_vec_1[left..index];
+                writer.write_all(node_s).expect("node write failed");
+                writer.write_all(b"\t").expect("write failed");
                 writer
                     .write_all(&haptype_number)
                     .expect("haptype information write failed");
-                writer.write_all(b"\t").expect("write failed");
-                writer.write_all(node_s).expect("node write failed");
                 writer.write_all(b"\n").expect("write failed");
                 left = index + 1;
             }
             // last node
             let node_s = &nodes_vec_1[left..];
+            writer.write_all(node_s).expect("node write failed");
+            writer.write_all(b"\t").expect("write failed");
             writer
                 .write_all(&haptype_number)
                 .expect("haptype information write failed");
-            writer.write_all(b"\t").expect("write failed");
-            writer.write_all(node_s).expect("node write failed");
             writer.write_all(b"\n").expect("write failed");
             // let mut tem = Vec::new();
             // for (index, i) in node_s.iter().enumerate() {
@@ -115,21 +115,21 @@ pub fn run(graph: &str, node: &str) {
             for index in position {
                 // println!("index:{},left:{}",index,left);
                 let node_s = &nodes_vec[left..index - 1];
+                writer.write_all(node_s).expect("node write failed");
+                writer.write_all(b"\t").expect("write failed");
                 writer
                     .write_all(&haptype_number)
                     .expect("haptype information write failed");
-                writer.write_all(b"\t").expect("write failed");
-                writer.write_all(&node_s).expect("node write failed");
                 writer.write_all(b"\n").expect("write failed");
                 left = index + 1;
             }
             // last node
             let node_s = &nodes_vec[left..nodes_vec.len() - 1];
+            writer.write_all(node_s).expect("node write failed");
+            writer.write_all(b"\t").expect("write failed");
             writer
                 .write_all(&haptype_number)
                 .expect("haptype information write failed");
-            writer.write_all(b"\t").expect("write failed");
-            writer.write_all(node_s).expect("node write failed");
             writer.write_all(b"\n").expect("write failed");
             // let mut tem = Vec::new();
             // for i in node_s {
@@ -178,7 +178,7 @@ mod tests {
         let mut output = String::new();
         File::open(node_path)?.read_to_string(&mut output)?;
 
-        assert_eq!(output, "1\t11\n1\t12\n1\t13\n01\t14\n01\t15\n");
+        assert_eq!(output, "11\t1\n12\t1\n13\t1\n14\t01\n15\t01\n");
 
         Ok(())
     }
@@ -204,7 +204,7 @@ mod tests {
         File::open(node_path)?.read_to_string(&mut output)?;
 
         // assert_eq!(output, "11\t1\n12\t1\n13\t1\n14\t01\n15\t01\n");
-        assert_eq!(output, "1\t11\n1\t12\n1\t13\n01\t14\n01\t15\n");
+        assert_eq!(output, "11\t1\n12\t1\n13\t1\n14\t01\n15\t01\n");
 
         Ok(())
     }
