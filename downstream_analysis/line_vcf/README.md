@@ -62,6 +62,6 @@ cat GZZTF.result.ps.1_sigSite.out_node_range GZZTF.result.ps.1_sigSite.out_ref_r
 
 ### 7. Use Bedtools to find overlapping ranges
 ```
-bedtools intersect -a pos.bubble.positions.TEM.chr.merge -b XTT22.chr.bed -wb > positions.TEM.chr.merge.overlap
+bedtools intersect -a pos.bubble.positions.TEM.chr.merge -b Srufi.chr.bed -wb > positions.TEM.chr.merge.overlap
 ```
 
