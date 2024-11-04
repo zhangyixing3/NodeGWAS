@@ -14,7 +14,7 @@ awk '$4 <= 1/45592180 {print $0}' GZZTF.result.ps > GZZTF.result.ps.1_sigSite.ou
 
 ### 3. Return Line Coordinates
 ```
-nodegwas liftover -g XTT22.anchorwave.giraffe.gfa -o node
+nodegwas liftover -g Srufi.anchorwave.giraffe.gfa -o node
 head node ref_result
 ==> node <==
 #ref_path    path    nodeid    node1    node2    offset1    offset2
