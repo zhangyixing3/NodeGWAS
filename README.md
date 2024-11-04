@@ -46,7 +46,6 @@ Sample list format:
 **Note**: The first column is the file path, and the second column is the sample ID in the output. The output file will be `node_table2.gz`. If `-t` is used, the node table will contain only two values (0, 1).
 
 ### 3. Run GWAS Analysis
-
 1. **EMMAX**: Since the number of nodes must be less than 20,000,000, GWAS is performed by chromosome.
 
 ```bash
@@ -60,23 +59,35 @@ Output files:
 1_vcf  2_vcf  3_vcf  4_vcf  5_vcf  6_vcf  7_vcf  8_vcf  9_vcf 10_vcf merged_vcf
 ```
 
+2. merge mutiple vcf files into one file and perform pca and kinship analysis.
+```
+for i in *vcf;do bgzip $i;done
+python ./merge_vcf.py  1_vcf.gz  2_vcf.gz  3_vcf.gz  4_vcf.gz  5_vcf.gz  6_vcf.gz  7_vcf.gz  8_vcf.gz  9_vcf.gz 10_vcf.gz   -o merge.vcf
+bgzip merge.vcf
+# vcf convert to tped
+plink --vcf merge.vcf.gz  --recode 12 transpose --out emmax_in --maf 0.05 --geno 0.1   --allow-extra-chr --threads 10 --id-delim + --double-id
+# tped convert to bed
+plink --tfile emmax_in  --make-bed --out emmax_in  --allow-extra-chr --threads 10 --id-delim + --double-id
+# pca
+plink  -bfile emmax_in --pca 10 --out merge_vcf2bed_PCA   --allow-extra-chr --threads 10 --id-delim + --double-id
+awk 'BEGIN{OFS="\t"}{print $1,$2,1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12}' merge_vcf2bed_PCA.eigenvec  > pca
+# kinship matrix
+emmax-kin-intel64 emmax_in -v -d 10 -o kinship
+```
+3. Perform GWAS analysis using EMMAX
+
 ```bash
 // Perform GWAS analysis
-emmax-intel64 -t emmax_in_1_vcf -o GZZTF.kinship.pca.output -p GZZTF.trait.order -k merge.kinship -c merge.pca
+mkdir 1 2 3  4 5 6 7 8 9 10
+for i in {1..10}; do mv "${i}_vcf.gz" "${i}";done
+cd 1
+plink --vcf 1_vcf.gz  --recode 12 transpose --out emmax_in --maf 0.05 --geno 0.1   --allow-extra-chr --threads 10 --id-delim + --double-id
+plink --tfile emmax_in  --make-bed --out emmax_in  --allow-extra-chr --threads 10 --id-delim + --double-id
+emmax-intel64 -t emmax_in -o GZZTF.kinship.pca.output -p ../GZZTF.trait.order -k ../kinship -c ../pca
+cd 2
+  ...
+cd 3
+  ...
 ```
 - Conduct GWAS analysis to identify associations between nodes and the phenotype of interest.
 - Generate a Manhattan plot to visualize the significance of these associations.
-
-### 4. Return Line Coordinates
-
-Finally, the results return linear coordinates. This step identifies specific genes or regions of interest based on the association results.
-
-```bash
-Nodegwas liftover -g ROC22.anchorwave.giraffe.gfa -o node.position
-```
-Output:
-```
-Connected path, source path of the node, node,node1,node2,node1_position(offset),node2_position(offset)
-ref_result three columns: path, node, position(offset)
-```
-By utilizing this coordinate information, we can easily identify candidate genes within a specific node range.
