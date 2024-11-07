@@ -49,12 +49,11 @@ contig_000538    158605803    288
 python PATH/scripts/node_positions.py GZZTF.result.ps.1_sigSite.out  node ref_result > GZZTF.node_positions
 ```
 
-### 5. Expand the range around significant sites
+### 5. Identify overlapping regions using bedtools
 ```
+# first method
 awk 'OFS="\t" { $2=$2-5000; $3=$3+5000; print $0 }' GZZTF.node_positions > GZZTF.node_positions.range
-```
-
-### 6. Identify overlapping regions using bedtools
-```
 bedtools intersect -a Srufi.chr.bed  -b GZZTF.node_positions.range -wb > GZZTF.node_positions.range.overlap
+# second method
+bedtools closest  -a <(sort -k1,1 -k2,2n GZZTF.node_positions) -b Srufi.v20210930.bed   -D ref > GZZTF.closest
 ```
