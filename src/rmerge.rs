@@ -32,7 +32,7 @@ pub struct Nodes {
 }
 impl Nodes {
     pub fn from_line(line: &Vec<u8>) -> Nodes {
-        let left = line.iter().position(|&b| b == b'\t').unwrap();
+        let left = line.iter().position(|&b| b == b'\t' || b == b' ').unwrap();
         let node = &line[..left];
         let count = &line[left + 1..];
         let mut node_value = 0;

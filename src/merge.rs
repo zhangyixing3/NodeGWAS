@@ -24,7 +24,7 @@ pub fn filetovec(file: String) -> (Vec<String>, Vec<String>) {
 
     for line in reader.lines() {
         let line = line.unwrap();
-        let line: Vec<&str> = line.trim().split('\t').collect();
+        let line: Vec<&str> = line.trim().split_whitespace().collect();
         paths.push(line[0].to_string());
         header.push(line[1].to_string());
     }
