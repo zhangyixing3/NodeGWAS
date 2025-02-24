@@ -144,7 +144,11 @@ pub fn run(gfa: String, reg: String, out: String) {
             if sample.contains(&reg) {
                 continue;
             }
-            for byte in parts.nth(4).unwrap() {
+
+            let chromosome = String::from_utf8(parts.nth(1).unwrap().to_vec())
+                .to_owned()
+                .expect("Failed to convert from UTF-8");
+            for byte in parts.nth(2).unwrap() {
                 if byte.is_ascii_digit() {
                     current_number.push(*byte);
                 } else {
@@ -181,7 +185,9 @@ pub fn run(gfa: String, reg: String, out: String) {
                                 //     nodes);
                                 writeln!(
                                     writer3,
-                                    "{}\t{}\t{}\t{}\t{}",
+                                    "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                                    chromosome,
+                                    sample,
                                     tem,
                                     number,
                                     tem_2,
@@ -196,7 +202,9 @@ pub fn run(gfa: String, reg: String, out: String) {
                                     }
                                     writeln!(
                                         writer2,
-                                        "{}\t{}\t{}\t{}\t{}",
+                                        "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                                        chromosome,
+                                        sample,
                                         bubble[i],
                                         tem,
                                         number,
