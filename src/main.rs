@@ -6,14 +6,6 @@ use env_logger::fmt::Target;
 use env_logger::Builder;
 use env_logger::Env;
 use flate2::bufread::GzDecoder;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::fs::File;
-use std::io;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::Read;
-use std::io::Write;
 use nodegwas::count;
 use nodegwas::extract;
 use nodegwas::filter;
@@ -24,6 +16,14 @@ use nodegwas::resource;
 use nodegwas::rliftover;
 use nodegwas::rmerge;
 use nodegwas::tobed;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::fs::File;
+use std::io;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Read;
+use std::io::Write;
 
 #[derive(Parser, Debug)]
 #[command(

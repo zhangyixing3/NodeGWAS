@@ -237,8 +237,8 @@ pub fn run(gfa: String, reg: String, out: String) {
                     .join(",");
                 writeln!(
                     writer3,
-                    "{}\t{}\t{}\t{}\t{}",
-                    tem, 0, tem_2, 0, nodes
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    chromosome, sample, tem, 0, tem_2, 0, nodes
                 )
                 .unwrap();
                 for i in 0_usize..bubble.len() {
@@ -247,8 +247,8 @@ pub fn run(gfa: String, reg: String, out: String) {
                     }
                     writeln!(
                         writer2,
-                        "{}\t{}\t{}\t{}\t{}",
-                        bubble[i], tem, 0, tem_2, 0
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                        chromosome, sample, bubble[i], tem, 0, tem_2, 0
                     )
                     .unwrap();
                 }
