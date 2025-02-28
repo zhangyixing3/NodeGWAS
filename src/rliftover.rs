@@ -155,7 +155,9 @@ pub fn run(gfa: String, reg: String, out: String) {
                         // 检测到完整的气泡（参考节点作为右边界）
                         let left_ref = bubble[0];
                         let left_pos = ref_genome_node
-                            .get(&left_ref).copied().unwrap_or(0);
+                            .get(&left_ref)
+                            .copied()
+                            .unwrap_or(0);
 
                         let right_ref = number;
                         let right_pos = ref_genome_node[&right_ref];
