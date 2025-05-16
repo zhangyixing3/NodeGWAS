@@ -1,7 +1,7 @@
 ## NodeGWAS Workflow
 
 ### Overview
-![Workflow Diagram](step.png)
+![Workflow Diagram](workflow.png)
 
 ### <span id="installation">Installation</span>
 
@@ -11,30 +11,43 @@ cd NodeGWAS && cargo build --release
 ```
 The binary file `nodegwas` will be located in the `NodeGWAS/target/release` directory.
 
-### 1. Input Data
-
-The workflow begins with the following input data:
-
+### 1. Prepare Graph Pangenome
+Use `minigraph-cactus` or `pggb` pipeline to construct the graph pangenome
+Chop the graph to reduce node length.
 ```bash
-(vg filter input_gam/AH1803.gam -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x Srufi.combined.giraffe.xg |
-vg view -aM - | nodegwas count -n input_gam/AH1803.filter.node) 1>AH1803.filter.node.log 2>&1
+vg mod -X  32    97samples.full.vg    >  97samples.full.chop.32.vg
+vg convert -f 97samples.full.chop.32.vg   > 97samples.full.chop.32.gfa
 ```
-- **AH1803.gam**: VG graph alignment format.
-- **Srufi.combined.giraffe.xg**: The graph pangenome.
-- The output file **AH1803.filter.node.gz** records the occurrence count of each node.
+Create d10 graph and build giraffe index
+```bash
+vg clip 97samples.full.chop.32.vg -d 10 -P 035_Col_CEN_v12 -m 1000 | \
+    vg clip -d 1 - -P 035_Col_CEN_v12 | \
+    vg clip -sS - -P 035_Col_CEN_v12 > 97samples.full.chop.32.d10.vg
+vg convert -f 97samples.full.chop.32.d10.vg  > 97samples.full.chop.32.d10.gfa
+vg  autoindex -p mapping.d5 -g 97samples.full.chop.32.d10.gfa -w giraffe -t 40 -M 600G
+```
+Mapping resequencing data using `vg giraffe`
+```bash
+vg giraffe -t 10 -p -Z 97samples.full.chop.32.d10.giraffe.gbz -m 97samples.full.chop.32.d10.min -d 97samples.full.chop.32.d10.dist  \
+    -f ../clean/1803_1.fq.gz  -f ../clean/1803_2.fq.gz \
+    1>1803.gam 2>1803.gam.log
+```
+- **1803.gam**: Graph pangenome alignment format.
 
+Convert GAM to nodes counts
+```bash
+(vg filter 1803.gam -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x \
+    97samples.full.chop.32.d10.xg |
+    vg view -aM - | nodegwas count -n 1803.filter.node) 1>AH1803.filter.node.log 2>&1
+```
 ### 2. Create Nodetable
 
-Next, extract alignment information from each sample and compile it into a table indicating the presence or absence of nodes.
-
-- **Accessions**: Accessions or samples in the study.
-- **Nodes**: Nodes within the graph pangenome.
-
+Combine node counts from each sample
 ```bash
 nodegwas rmerge -i sample.list -o node_table -n 2 -t
 ```
 
-Sample list format:
+sample.list format:
 ```
 ../nodes/10020.gam.filter.node.gz	10020
 ../nodes/10022.gam.filter.node.gz	10022
@@ -43,55 +56,43 @@ Sample list format:
 ../nodes/1061.gam.filter.node.gz	1061
 ../nodes/1062.gam.filter.node.gz	1062
 ```
-**Note**: The first column is the file path, and the second column is the sample ID in the output. The output file will be `node_table2.gz`. If `-t` is used, the node table will contain only two values (0, 1).
-
-### 3. split vcf file by chromosome and perform pca and kinship analysis
-1. **EMMAX**: Since the number of nodes must be less than 20,000,000, GWAS is performed by chromosome.
-
+**Column 1**: File path to node count.
+**Column 2**: Sample ID.
+### 3. Perform GWAS 
 ```bash
-# Extract nodes from the graph pangenome
-nodegwas extract -g Srufi.combined.giraffe.gfa -n w.n.node
-# Convert the node table to VCF format and split by chromosome
-nodegwas tovcf -k nodegwas2.gz -n w.p.node
-```
-Output files:
-```
-1_vcf  2_vcf  3_vcf  4_vcf  5_vcf  6_vcf  7_vcf  8_vcf  9_vcf 10_vcf merged_vcf
-```
-
-2. merge mutiple vcf files into one file and perform pca and kinship analysis.
-```bash
-for i in *vcf;do bgzip $i;done
-python ./merge_vcf.py  1_vcf.gz  2_vcf.gz  3_vcf.gz  4_vcf.gz  5_vcf.gz  6_vcf.gz  7_vcf.gz  8_vcf.gz  9_vcf.gz 10_vcf.gz   -o merge.vcf
-bgzip merge.vcf
-# vcf convert to tped
-plink --vcf merge.vcf.gz  --recode 12 transpose --out emmax_in --maf 0.05 --geno 0.1   --allow-extra-chr --threads 10 --id-delim + --double-id
-# tped convert to bed
-plink --tfile emmax_in  --make-bed --out emmax_in  --allow-extra-chr --threads 10 --id-delim + --double-id
-# pca
-plink  -bfile emmax_in --pca 10 --out merge_vcf2bed_PCA   --allow-extra-chr --threads 10 --id-delim + --double-id
-awk 'BEGIN{OFS="\t"}{print $1,$2,1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12}' merge_vcf2bed_PCA.eigenvec  > pca
-# kinship matrix
-emmax-kin-intel64 emmax_in -v -d 10 -o kinship
-```
-### 4. Perform GWAS analysis using EMMAX
-
-```bash
-# create directory for each chromosome
-mkdir 1 2 3  4 5 6 7 8 9 10
-# move vcf files to each directory
-for i in {1..10}; do mv "${i}_vcf.gz" "${i}";done
-cd 1
+#  Convert Nodetable to VCF
+nodegwas tovcf -k nodegwas2.gz
 # vcf to tped
-plink --vcf 1_vcf.gz  --recode 12 transpose --out emmax_in --maf 0.05 --geno 0.1   --allow-extra-chr --threads 10 --id-delim + --double-id
+plink --vcf nodegwas2.vcf.gz  --recode 12 transpose --out emmax_in --maf 0.05 --geno 0.1   --allow-extra-chr --threads 10 --id-delim + --double-id
 # tped to bed
 plink --tfile emmax_in  --make-bed --out emmax_in  --allow-extra-chr --threads 10 --id-delim + --double-id
-# run emmax
-emmax-intel64 -t emmax_in -o GZZTF.kinship.pca.output -p ../GZZTF.trait.order -k ../kinship -c ../pca
-cd 2
-  ...
-cd 3
-  ...
+# kinship matrix
+gemma  -bfile emmax_in  -gk 2 -p  FT10.order.1
+# GWAS analysis using gemma
+gemma    -bfile emmax_in   -k output/result.sXX.txt -lmm 2  -p  FT10.order.1
 ```
-- Conduct GWAS analysis to identify associations between nodes and the phenotype of interest.
-- Generate a Manhattan plot to visualize the significance of these associations.
+
+Return to Linear Genome Coordinates
+```bash
+nodegwas  rliftover -g  97samples.full.chop.gfa  -f 035 -o 97samples.full.chop
+```
+**97samples.full.chop.bubble.positions**: Bubble structures in linear coordinates
+**97samples.full.chop.non_ref.node.positions**: Non-reference node positions
+**035.node.positions**:  Cumulative offsets of nodes in the reference
+
+```bash
+awk '$10<0.01{print $2,$1,$3,$10}' result.assoc.txt  > result.assoc.txt.finally.filter
+python ./node_position.py   result.assoc.txt.finally.filter full_97.non_ref.node.positions 035.node.positions   > result.assoc.txt.finally.filter.position
+```
+Example Output
+```bash
+head result.assoc.txt.finally.filter.position
+chrsome	start	end	node_id	pvalue
+1	3956	4460	5126	4.131444e-03
+1	4465	4466	5410	7.229633e-03
+1	4465	4466	5411	4.894490e-03
+1	4465	4466	5415	3.666478e-03
+1	4465	4466	5416	3.060831e-03
+```
+
+
