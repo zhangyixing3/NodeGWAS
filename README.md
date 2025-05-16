@@ -37,7 +37,7 @@ vg giraffe -t 10 -p -Z 97samples.full.chop.32.d10.giraffe.gbz -m 97samples.full.
 Convert GAM to nodes counts
 ```bash
 (vg filter 1803.gam -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x \
-    97samples.full.chop.32.d10.xg |
+    97samples.full.chop.32.d10.xg | \
     vg view -aM - | nodegwas count -n 1803.filter.node) 1>AH1803.filter.node.log 2>&1
 ```
 ### 2. Create Nodetable
@@ -56,8 +56,8 @@ sample.list format:
 ../nodes/1061.gam.filter.node.gz	1061
 ../nodes/1062.gam.filter.node.gz	1062
 ```
-**Column 1**: File path to node count.
-**Column 2**: Sample ID.
+**Column 1**: File path to node count   
+**Column 2**: Sample ID 
 ### 3. Perform GWAS 
 ```bash
 #  Convert Nodetable to VCF
@@ -76,9 +76,9 @@ Return to Linear Genome Coordinates
 ```bash
 nodegwas  rliftover -g  97samples.full.chop.gfa  -f 035 -o 97samples.full.chop
 ```
-**97samples.full.chop.bubble.positions**: Bubble structures in linear coordinates
-**97samples.full.chop.non_ref.node.positions**: Non-reference node positions
-**035.node.positions**:  Cumulative offsets of nodes in the reference
+**97samples.full.chop.bubble.positions**: Bubble structures in linear coordinates  
+**97samples.full.chop.non_ref.node.positions**: Non-reference node positions   
+**035.node.positions**:  Cumulative offsets of nodes in the reference  
 
 ```bash
 awk '$10<0.01{print $2,$1,$3,$10}' result.assoc.txt  > result.assoc.txt.finally.filter
