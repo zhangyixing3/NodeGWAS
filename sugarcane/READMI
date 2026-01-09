@@ -1,18 +1,27 @@
 ### Performed nodegwas in sugarcane
 
 ### build index
+```
 ~/software/vg autoindex --threads 40 --workflow giraffe -T ./ -r ~/reference/Srufi/Srufi.v20210930.chr.fasta -v ../index/Srufi.combined.sorted.vcf.gz -p Srufi.combined
+```
 ### alignment
+```
 for f in ../clean/*_1.fq.gz; do s=$(basename $f _1.fq.gz);  vg giraffe -t 10 -p -Z Srufi.combined.giraffe.gbz -m Srufi.combined.min -d Srufi.combined.dist -f ../clean/${s}_1.fq.gz -f ../clean/${s}_2.fq.gz 1>${s}.gam 2>${s}.gam.log 2>${s}.log; done
-
+```
 ### filter
+```
 for i in ../*.gam; do filename=$(basename "$i"); echo "vg filter ${filename} -r 0.90 -fu -m 1 -q 15 -D 999 -t 2 -x Srufi.combined.xg > ${filename}.filtered.gam"; done
-
+```
 ### node
+```
 for i in ../*filtered.gam; do filename=$(basename "$i"); nodegwas count -n ${filename} ;done
-created nodetable
+```
+### created nodetable
+```
 nodegwas rmerge -i sample.list -o node_table -n 2 -t
+```
 ### node chr output
+```
 nodegwas extract -g Srufi.combined.giraffe.gfa -n w.p.node
 head  w.p.node
 148278833       08
@@ -25,6 +34,9 @@ head  w.p.node
 148278840       08
 148278841       08
 148278842       08
+```
 ### tovcf
+```
 nodegwas tovcf -k nodegwas.gz -n w.p.node
+```
 
