@@ -27,7 +27,7 @@ def process_bubble_file(node_file, hash_table):
             node = columns[2]  # 3rd column in 0-based index
             # Check if third_column exists in hash_table
             if node in hash_table:
-                print(f"{columns[0]}\t{columns[5]}\t{columns[6]}\t{node}\t{hash_table[node]}")
+                print(f"{columns[1]}:{columns[0]}\t{columns[5]}\t{columns[6]}\t{node}\t{hash_table[node]}")
 
 
 def process_ref_result_file(ref_result_file, hash_table):
@@ -37,12 +37,13 @@ def process_ref_result_file(ref_result_file, hash_table):
     with open(ref_result_file, 'r') as f:
         for line in f:
             columns = line.split()
-            if len(columns) != 3:
+            if len(columns) != 4:
                 break
-            node = columns[1]  # 2nd column in 0-based index
+            node = columns[2]  # 2nd column in 0-based index
             # Check if second_column exists in hash_table
             if node in hash_table:
-                print(f"{columns[0]}\t{columns[2]}\t{columns[2]}\t{node}\t{hash_table[node]}")
+                #The output will be: ref_name:chr_name offset offset node_id P-value
+                print(f"{columns[0]}:{columns[1]}\t{columns[3]}\t{columns[3]}\t{node}\t{hash_table[node]}")
 
 
 def main():
@@ -54,6 +55,8 @@ def main():
     sigsite_file = sys.argv[1]    # Elongation2.result.ps.1_sigSite.out
     node_file = sys.argv[2]       # node
     ref_result_file = sys.argv[3] # ref_result
+
+    print("chromosome\tstart\tend\tnode_id\tpvalue")
 
     # Step 1: Process the sigsite file to create the hash table
     hash_table = process_sigsite_file(sigsite_file)
